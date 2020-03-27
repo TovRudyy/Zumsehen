@@ -1,0 +1,14 @@
+LEVEL CPU SIZE 4
+1.fju749.hlrs.de
+2.fju749.hlrs.de
+3.fju749.hlrs.de
+4.fju749.hlrs.de
+
+LEVEL NODE SIZE 1
+fju749.hlrs.de
+
+LEVEL THREAD SIZE 4
+THREAD 1.1.1
+THREAD 1.1.2
+THREAD 1.2.1
+THREAD 1.2.2
