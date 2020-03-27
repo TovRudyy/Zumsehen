@@ -6,6 +6,7 @@
 
 # Python
 *.pyc
+src/__pycache__
 .eggs
 *.egg-info
 
