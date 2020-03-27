@@ -1,0 +1,2 @@
+#Paraver (10/04/01 at 18:30):20125743:2(4,4):2:2(4:2,4:1):1(4:2)
+Description: 2 Nodes. 4 CPUs each node. 2 application. Application 1 has 2 tasks: 4 threads on node 2 and 4 threads on node 1. Application 2 has 1 tasks with 4 threads on node 2.
