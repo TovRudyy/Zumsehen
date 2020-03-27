@@ -1,23 +1,17 @@
+from src.utils.error import DEBUG, dprint
 
 class TraceMetaData:
     """ Store Trace's Metadata """
-    Name: str
-    Path: str
-    Type: str
-    ExecTime: int
-    Date = datetime
-    # dim[1]: node id; dim[2]: amount of CPUs
-    Nodes = [[]]
-    # dim[1]: app id; dim[2]: task id; dim[3]: thread id; dim[4]: node id
-    Apps = [[[[]]]]
-
+    
     def __init__(self, Name="", Path="", Type="", ExecTime=None, Date=None, Nodes=None, Apps=None):
         self.Name = Name
         self.Path = Path
         self.Type = Type
         self.ExecTime = ExecTime
         self.Date = Date
+        # 2D list. Dim[1]: node id; dim[2]: amount of CPUs
         self.Nodes = Nodes[:]
+        # 4D list. Dim[1]: app id; dim[2]: task id; dim[3]: thread id; dim[4]: node id
         self.Apps = Apps
         if DEBUG: dprint("DEBUG:", self.print(), sep=" ")
 

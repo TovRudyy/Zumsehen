@@ -6,15 +6,15 @@ from src.utils.error import eprint, dprint
 PARAVER_FILE = "Paraver (.prv)"
 PARAVER_MAGIC_HEADER = "#Paraver"
 
-def header_parser(header):
+def header_parser(file, header):
     if not PARAVER_MAGIC_HEADER in header:
-        eprint("ERROR: The file", TRACE_PATH, "is not a valid Paraver file!", sep=" ")
+        eprint("ERROR: The file", file.name, "is not a valid Paraver file!", sep=" ")
     else:
         header = header.replace("#Paraver (", "").replace("at ", "")
         traceDate, match, other = header.partition("):")
         traceDate = datetime.strptime(traceDate, "%d/%m/%Y %H:%M")
-        traceName = os.path.basename(trace.name)
-        tracePath = os.path.abspath(trace.name)
+        traceName = os.path.basename(file.name)
+        tracePath = os.path.abspath(file.name)
         traceType = PARAVER_FILE
         traceExecTime, match, other = other.partition(":")
         traceExecTime = int(traceExecTime[:-3])
@@ -44,10 +44,4 @@ def header_parser(header):
                 traceTasks.append(threads)
         traceApps.append(traceTasks)
         
-        return TraceMetadata(traceName, tracePath, traceType, traceExecTime, traceDate, traceNodes, traceApps)
-
-
-with open(TRACE_PATH, "r") as trace:
-    header_info = ""
-    header = trace.readline()
-    header_parser(header)
+        return TraceMetaData(traceName, tracePath, traceType, traceExecTime, traceDate, traceNodes, traceApps)
