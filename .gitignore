@@ -1,0 +1,28 @@
+# Editors
+.idea
+*.sw[op]
+*~
+.vscode
+
+# Python
+*.pyc
+src/__pycache__
+test/__pycache__
+.eggs
+*.egg-info
+
+# Virtualenv
+.env
+venv
+
+.DS_Store
+.project
+.pydevproject
+
+.cache
+cache
+
+.pytest_cache/
+
+pip.conf
+build/

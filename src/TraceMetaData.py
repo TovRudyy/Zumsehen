@@ -1,9 +1,24 @@
-from src.utils.error import DEBUG, dprint
+import logging
+from datetime import datetime
+from typing import List
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 
 class TraceMetaData:
     """ Store Trace's Metadata """
-    
-    def __init__(self, Name="", Path="", Type="", ExecTime=None, Date=None, Nodes=None, Apps=None):
+
+    def __init__(
+        self,
+        Name: str = "",
+        Path: str = "",
+        Type: str = "",
+        ExecTime: int = None,
+        Date: datetime = None,
+        Nodes: List[int] = None,
+        Apps: List[List[List[int]]] = None,
+    ):
         self.Name = Name
         self.Path = Path
         self.Type = Type
@@ -13,7 +28,7 @@ class TraceMetaData:
         self.Nodes = Nodes[:]
         # 4D list. Dim[1]: app id; dim[2]: task id; dim[3]: thread id; dim[4]: node id
         self.Apps = Apps
-        if DEBUG: dprint("DEBUG:", self.print(), sep=" ")
+        logger.debug(self.print())
 
     def print(self):
         """ Print class' information """
@@ -23,23 +38,24 @@ class TraceMetaData:
         myself += f"Path: {self.Path}\n"
         myself += f"Type: {self.Type} \n"
         myself += f"ExecTime: {self.ExecTime}\n"
-        if self.Date == None:
+        # si comparas con None, True o False es "is", no "=="
+        if self.Date is None:
             myself += "No date available\n"
         else:
             myself += f'Date: {self.Date.isoformat(" ")}\n'
-        if self.Nodes == None:
+        if self.Nodes is None:
             myself += "No node configuration available\n"
         else:
             myself += "Node\tCPU list\n"
             for i in range(len(self.Nodes)):
                 myself += f"{i}\t"
                 j = 0
-                while j < self.Nodes[i][0]-1:
-                    myself += f"{j+1} "
+                while j < self.Nodes[i][0] - 1:
+                    myself += f"{j + 1} "
                     j += 1
-                myself += f"{j+1}\n"
+                myself += f"{j + 1}\n"
 
-        if self.Apps == None:
+        if self.Apps is None:
             myself += "No application configuration avaiable\n"
         else:
             myself += "APP\tTask\tThread\tNode\n"

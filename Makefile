@@ -1,4 +1,4 @@
-SOURCES:=app/ test/
+SOURCES:=src/ test/
 
 .PHONY: install
 install:
