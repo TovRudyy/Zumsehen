@@ -23,11 +23,10 @@ def paraver_header_parser(header):
     htraceCPUs = htraceCPUs.split(",")
     
     traceNodes = list(map(int, htraceCPUs))
-
+    logger.debug(f"traceNodes = {traceNodes}")
     appls_list, _, other = other[1:].partition(":")
     number_apps = int(appls_list)
     traceApps = []
-    logger.debug(f"appl list: {other}")
     for i in range(number_apps):
         traceTasks, _, other = other.partition("(")
         number_tasks = int(traceTasks)
@@ -36,23 +35,24 @@ def paraver_header_parser(header):
         traceTasks = []
         for j in range(number_tasks):
             config_threads = list(map(int, config[j].split(":")))
-            threads = [config_threads[1] for k in range(config_threads[0])]
-            traceTasks.append(threads)
+            traceTasks.append(dict(nThreads=config_threads[0],
+                                   node=config_threads[1],))
     traceApps.append(traceTasks)
-
     return traceExecTime, traceDate, traceNodes, traceApps
 
 
 def parse_file(file):
-    with open("file") as f:
+    with open(file) as f:
         header = f.readline()
         if PARAVER_MAGIC_HEADER not in header:
-            logger.error(f"The file {file.name} is not a valid Paraver file!")
+            logger.error(f"The file {f.name} is not a valid Paraver file!")
 
-        traceName = os.path.basename(file.name)
-        tracePath = os.path.abspath(file.name)
+        traceName = os.path.basename(f.name)
+        tracePath = os.path.abspath(f.name)
         traceType = PARAVER_FILE
 
         traceExecTime, traceDate, traceNodes, traceApps = paraver_header_parser(header)
 
         return TraceMetaData(traceName, tracePath, traceType, traceExecTime, traceDate, traceNodes, traceApps)
+    
+parse_file('/home/orudyy/Repositories/Zumsehen/test/header_samples/h2.txt')

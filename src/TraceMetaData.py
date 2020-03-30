@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List
+from typing import List, Dict
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -16,23 +16,23 @@ class TraceMetaData:
         Type: str = "",
         ExecTime: int = None,
         Date: datetime = None,
+        # len(Nodes) = #nodes | Nodes[0] = #CPUs of Node 1
         Nodes: List[int] = None,
-        Apps: List[List[List[int]]] = None,
+        # len(Apps) = #Apps | len(Apps[0]) = #Tasks of APP 1 | App[0][0] = {"nThreads": int, "node": int}
+        Apps: List[List[Dict]] = None,
     ):
         self.Name = Name
         self.Path = Path
         self.Type = Type
         self.ExecTime = ExecTime
         self.Date = Date
-        # List containing how many CPUs has each node
         self.Nodes = Nodes[:]
-        # 4D list. Dim[1]: app id; dim[2]: task id; dim[3]: thread id; dim[4]: node id
         self.Apps = Apps[:]
-        logger.debug(self.print())
+        logger.debug(self)
 
-    def print(self):
+    def __repr__(self):
         """ Print class' information """
-        myself = f"IFORMATION OF OBJECT {type(self)}\n"
+        myself = f"INFORMATION OF OBJECT {type(self)}\n"
         myself += "--------------------\n"
         myself += f"Name: {self.Name}\n"
         myself += f"Path: {self.Path}\n"
@@ -49,7 +49,7 @@ class TraceMetaData:
             for i in range(len(self.Nodes)):
                 myself += f"{i}\t"
                 j = 0
-                while j < self.Nodes[i][0] - 1:
+                while j < self.Nodes[0] - 1:
                     myself += f"{j + 1} "
                     j += 1
                 myself += f"{j + 1}\n"
@@ -57,18 +57,12 @@ class TraceMetaData:
         if self.Apps is None:
             myself += "No application configuration avaiable\n"
         else:
-            myself += "APP\tTask\tThread\tNode\n"
+            myself += "APP\tTask\tThreads\tNode\n"
             app_id = 1
             for app in self.Apps:
-                task_id = 1
-                for task in app:
-                    thread_id = 1
-                    for thread in task:
-                        node_id = thread
-                        myself += f"{app_id}\t{task_id}\t{thread_id}\t{node_id}\n"
-                        thread_id += 1
-                    task_id += 1
-                app_id += 1
+                 task_id = 1
+                 myself += " ".join([ f"{app_id}\t{task_id}\t{task['nThreads']}\t{task['node']}\n" for task in app ])
+                 app_id += 1
 
         myself += "--------------------"
         return myself
