@@ -11,7 +11,7 @@ PARAVER_FILE = "Paraver (.prv)"
 PARAVER_MAGIC_HEADER = "#Paraver"
 
 
-def header_parser(header):
+def paraver_header_parser(header):
     header = header.replace("#Paraver (", "").replace("at ", "")
     traceDate, _, other = header.partition("):")
     traceDate = datetime.strptime(traceDate, "%d/%m/%Y %H:%M")
@@ -21,16 +21,12 @@ def header_parser(header):
     htraceNodes, _, other = other.partition("(")
     htraceCPUs, _, other = other.partition(")")
     htraceCPUs = htraceCPUs.split(",")
-    traceNodes = []
-    for i in range(len(htraceNodes)):
-        # mucho mas eficiente (aqui no haria falta, pero los maps te pueden ser muy muy utiles en el futuro para
-        # la eficiencia ya que cosas tan simples se compilan a C directamente
-        traceNodes.append(list(map(lambda trace_cpu: int(trace_cpu), htraceCPUs[i])))
+    
+    traceNodes = list(map(int, htraceCPUs))
 
     appls_list, _, other = other[1:].partition(":")
     number_apps = int(appls_list)
     traceApps = []
-    # ejemplo logging
     logger.debug(f"appl list: {other}")
     for i in range(number_apps):
         traceTasks, _, other = other.partition("(")
@@ -39,11 +35,8 @@ def header_parser(header):
         config = config.split(",")
         traceTasks = []
         for j in range(number_tasks):
-            config_threads = config[j].split(":")
-            threads = []
-            for k in range(int(config_threads[0])):
-                threads.append(int(config_threads[1]))
-
+            config_threads = list(map(int, config[j].split(":")))
+            threads = [config_threads[1] for k in range(config_threads[0])]
             traceTasks.append(threads)
     traceApps.append(traceTasks)
 
@@ -60,6 +53,6 @@ def parse_file(file):
         tracePath = os.path.abspath(file.name)
         traceType = PARAVER_FILE
 
-        traceExecTime, traceDate, traceNodes, traceApps = header_parser(header)
+        traceExecTime, traceDate, traceNodes, traceApps = paraver_header_parser(header)
 
         return TraceMetaData(traceName, tracePath, traceType, traceExecTime, traceDate, traceNodes, traceApps)

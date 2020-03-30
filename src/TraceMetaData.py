@@ -24,10 +24,10 @@ class TraceMetaData:
         self.Type = Type
         self.ExecTime = ExecTime
         self.Date = Date
-        # 2D list. Dim[1]: node id; dim[2]: amount of CPUs
+        # List containing how many CPUs has each node
         self.Nodes = Nodes[:]
         # 4D list. Dim[1]: app id; dim[2]: task id; dim[3]: thread id; dim[4]: node id
-        self.Apps = Apps
+        self.Apps = Apps[:]
         logger.debug(self.print())
 
     def print(self):
@@ -38,7 +38,6 @@ class TraceMetaData:
         myself += f"Path: {self.Path}\n"
         myself += f"Type: {self.Type} \n"
         myself += f"ExecTime: {self.ExecTime}\n"
-        # si comparas con None, True o False es "is", no "=="
         if self.Date is None:
             myself += "No date available\n"
         else:
