@@ -60,9 +60,26 @@ class TraceMetaData:
             myself += "APP\tTask\tThreads\tNode\n"
             app_id = 1
             for app in self.Apps:
-                 task_id = 1
-                 myself += " ".join([ f"{app_id}\t{task_id}\t{task['nThreads']}\t{task['node']}\n" for task in app ])
+                 myself += "".join([ f"{app_id}\t{task_id}\t{task['nThreads']}\t{task['node']}\n" for task_id, task in enumerate(app)])
                  app_id += 1
 
         myself += "--------------------"
         return myself
+    
+    def get_name(self):
+        return self.Name
+    
+    def get_path(self):
+        return self.Path
+    
+    def get_time(self):
+        return self.ExecTime
+    
+    def get_date(self):
+        return self.Date
+    
+    def get_Nodes(self):
+        return self.Nodes
+    
+    def get_Apps(self):
+        return self.Apps

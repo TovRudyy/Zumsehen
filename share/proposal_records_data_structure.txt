@@ -1,0 +1,27 @@
+Paraver tracefiles have 3 types of record:
+    -States         (record_id 1)
+    -Events         (record_id 2)
+    -Communications (record_id 3)
+
+Format of State records:
+    1:cpu_id:appl_id:task_id:thread_id:begin_time:end_time:State
+
+Format of Event records:
+    2:cpu_id:appl_id:task_id:thread_id:time:event_type_0:event_value_0:event_type_1:event_value_1:...:event_type_n:event_value_n
+
+Format of Communication records:
+    3:object_send:lsend:psend:object_recv:lrecv:precv:size:tag
+
+    object_send -> cpu_send_id:ptask_send_id:task_send_id:thread_send_id
+    object_recv -> cpu_recv_id:ptask_recv_id:task_recv_id:thread_recv_id
+
+Poposed data structures to hold records:
+    - SQL Data Base
+        - States and Events data base:
+            id:long, record_t:int, cpu_id:int, appl_id:int, thread_id:int, time_ini:long, time_fi:long, state:int, event_t:long, event_val:long
+                Rules:
+                    * one row can only contain one record type (one state or one event)
+                    * when containing one state, the event values must be null
+                    * when containing one event, the state value must be null and time_ini = time_fi
+        - Communication records data base:
+            id:long, record_t:int, cpu_send_id:int, ptask_send_id:int, task_send_id:int, thread_send_id:int, lsend:long, psend:long, cpu_recv_id:int, ptask_recv_id:int, task_recv_id:int, thread_recv_id:int, lrecv:long, precv:long, size:ling, tag:int

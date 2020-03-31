@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import datetime
 
-from src.TraceMetaData import TraceMetaData
+from TraceMetaData import TraceMetaData
 
 logger = logging.getLogger(__name__)
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
