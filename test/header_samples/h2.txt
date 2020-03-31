@@ -1,2 +1,0 @@
-#Paraver (18/03/2020 at 09:01):1279202118747_ns:1(32):1:1(32:1),1
-Description: 1 Node. 32 CPUs each node. 1 application. 1 tasks with 32 threads.

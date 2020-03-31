@@ -31,7 +31,7 @@ class TraceMetaData:
         logger.debug(self)
 
     def __repr__(self):
-        """ Print class' information """
+        """ Print object's information """
         myself = f"INFORMATION OF OBJECT {type(self)}\n"
         myself += "--------------------\n"
         myself += f"Name: {self.Name}\n"

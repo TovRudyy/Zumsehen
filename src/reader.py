@@ -54,5 +54,3 @@ def parse_file(file):
         traceExecTime, traceDate, traceNodes, traceApps = paraver_header_parser(header)
 
         return TraceMetaData(traceName, tracePath, traceType, traceExecTime, traceDate, traceNodes, traceApps)
-    
-parse_file('/home/orudyy/Repositories/Zumsehen/test/header_samples/h2.txt')

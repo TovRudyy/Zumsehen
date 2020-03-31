@@ -26,3 +26,4 @@ cache
 
 pip.conf
 build/
+test/headers/*.py

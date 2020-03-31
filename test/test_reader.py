@@ -36,12 +36,9 @@ def compare_trace_metadata(trace_a, trace_b):
             "#Paraver (18/03/2020 at 11:15):1056311873701_ns:1(48):1:48(1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1,1:1),49",
             (1056311873701, datetime.strptime("18/03/2020 11:15", "%d/%m/%Y %H:%M"), [48], [[{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1},{"nThreads": 1, "node": 1}]]),
         ),
-        (
-            "#Paraver (17/02/2020 at 11:37):1857922_ns:1(4):1:2(2:1,2:1)",
-            (1857922, datetime.strptime("17/02/2020 11:37", "%d/%m/%Y %H:%M"), [4], [[{"nThreads": 2, "node": 1}, {"nThreads": 2, "node": 1}]]),
-        ),
     ),
 )
 
 def test_header_parser(header, expected_header):
     assert expected_header == paraver_header_parser(header)
+    
