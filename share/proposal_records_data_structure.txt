@@ -16,7 +16,7 @@ Format of Communication records:
     object_recv -> cpu_recv_id:ptask_recv_id:task_recv_id:thread_recv_id
 
 Poposed data structures to hold records:
-    - SQL Data Base
+    - SQL like data frame
         - States and Events data base:
             id:long, record_t:int, cpu_id:int, appl_id:int, thread_id:int, time_ini:long, time_fi:long, state:int, event_t:long, event_val:long
                 Rules:
