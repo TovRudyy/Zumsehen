@@ -4,41 +4,67 @@ from datetime import datetime
 
 from src.TraceMetaData import TraceMetaData
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
+logging.basicConfig(format=FORMAT)
+logger.setLevel(logging.DEBUG)
 
 PARAVER_FILE = "Paraver (.prv)"
 PARAVER_MAGIC_HEADER = "#Paraver"
 
+def paraver_header_date(header):
+    date, _, other = header.replace("#Paraver (", "").replace("at ", "").partition("):")
+    date = datetime.strptime(date, "%d/%m/%Y %H:%M")
+    logger.debug(f"date = {date}")
+    return date
+
+def paraver_header_time(header):
+    time, _, other = header[header.find("):")+2:].partition("_ns")
+    time = int(time)
+    logger.debug(f"time = {time}")
+    return time
+
+def paraver_header_nodes(header):
+    nodes = header[header.find("_ns:")+4:]
+    if nodes[0] == "0":
+        nodes = None
+    else:
+        nodes = nodes[nodes.find("(")+1:nodes.find(")")]
+        nodes = nodes.split(",")
+        nodes = list(map(int, nodes))
+    logger.debug(f"Nodes = {nodes}")
+    return nodes
+
+def paraver_header_apps(header):
+    apps_list = []
+    apps = header[header.find("_ns:")+4:]
+    apps, _, other = apps.partition(":")
+    apps, _, other = other.partition(":")
+    number_apps = int(apps)
+    i = 0
+    while i < number_apps:
+        apps, _, other = other.partition("(")
+        number_tasks = int(apps)
+        apps, _, other = other.partition(")")
+        apps = apps.split(",")
+        j = 0
+        tasks_list = []
+        while j < number_tasks:
+            tmp = list(map(int, apps[j].split(":")))
+            tasks_list.append(dict(nThreads=tmp[0],
+                                   node=tmp[1]))
+            j += 1
+        apps_list.append(tasks_list)
+        i += 1
+    logger.debug(f"Applications: {apps_list}")
+    return apps_list
 
 def paraver_header_parser(header):
-    header = header.replace("#Paraver (", "").replace("at ", "")
-    traceDate, _, other = header.partition("):")
-    traceDate = datetime.strptime(traceDate, "%d/%m/%Y %H:%M")
-    traceExecTime, _, other = other.partition(":")
-    traceExecTime = int(traceExecTime[:-3])
-
-    htraceNodes, _, other = other.partition("(")
-    htraceCPUs, _, other = other.partition(")")
-    htraceCPUs = htraceCPUs.split(",")
-    
-    traceNodes = list(map(int, htraceCPUs))
-    logger.debug(f"traceNodes = {traceNodes}")
-    appls_list, _, other = other[1:].partition(":")
-    number_apps = int(appls_list)
-    traceApps = []
-    for i in range(number_apps):
-        traceTasks, _, other = other.partition("(")
-        number_tasks = int(traceTasks)
-        config, _, other = other.partition(")")
-        config = config.split(",")
-        traceTasks = []
-        for j in range(number_tasks):
-            config_threads = list(map(int, config[j].split(":")))
-            traceTasks.append(dict(nThreads=config_threads[0],
-                                   node=config_threads[1],))
-    traceApps.append(traceTasks)
-    return traceExecTime, traceDate, traceNodes, traceApps
+    header_time     = paraver_header_time(header)
+    header_date     = paraver_header_date(header)
+    header_nodes    = paraver_header_nodes(header)
+    header_apps     = paraver_header_apps(header)
+    return header_time, header_date, header_nodes, header_apps
 
 
 def parse_file(file):
@@ -47,10 +73,10 @@ def parse_file(file):
         if PARAVER_MAGIC_HEADER not in header:
             logger.error(f"The file {f.name} is not a valid Paraver file!")
 
-        traceName = os.path.basename(f.name)
-        tracePath = os.path.abspath(f.name)
-        traceType = PARAVER_FILE
+        trace_name = os.path.basename(f.name)
+        trace_path = os.path.abspath(f.name)
+        trace_type = PARAVER_FILE
 
-        traceExecTime, traceDate, traceNodes, traceApps = paraver_header_parser(header)
+        trace_exec_time, trace_date, trace_nodes, trace_apps = paraver_header_parser(header)
 
-        return TraceMetaData(traceName, tracePath, traceType, traceExecTime, traceDate, traceNodes, traceApps)
+        return TraceMetaData(trace_name, trace_path, trace_type, trace_exec_time, trace_date, trace_nodes, trace_apps)
