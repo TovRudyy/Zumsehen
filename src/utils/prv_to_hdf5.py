@@ -1,5 +1,8 @@
+import itertools
 import logging
 import time
+from concurrent.futures.process import ProcessPoolExecutor
+from functools import reduce
 
 import pandas as pd
 import numpy as np
@@ -52,9 +55,11 @@ COL_COMM_RECORD = [
 ]
 
 MAX_READ_BYTES = None
-TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
-TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
-#TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
+# TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
+# TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
+
+
+TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
 
 
 # TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
@@ -126,9 +131,9 @@ def read_lines(file, bytes=None):
 def load_as_dataframe(file):
     # df_state_event = pd.DataFrame(columns=COL_STATE_EVENT_RECORD)
     # df_comm = pd.DataFrame(columns=COL_COMM_RECORD)
-    df_state = np.array(ndim=2)
-    df_event = np.array(ndim=2)
-    df_comm = np.array(ndim=2)
+    df_state = []
+    df_event = []
+    df_comm = []
     with open(file, "r") as f:
         # Discard the header
         f.readline()
@@ -146,23 +151,89 @@ def load_as_dataframe(file):
             else:
                 logger.warning(f"Invalid record type, skipping...")
         logger.info(f"Elapsed parsing time: {time.time() - start_time}")
-        
+
     start_time = time.time()
     df_state = pd.DataFrame(df_state, columns=COL_STATE_RECORD)
     df_event = pd.DataFrame(df_event, columns=COL_EVENT_RECORD)
     df_comm = pd.DataFrame(df_comm, columns=COL_COMM_RECORD)
-    logger.info(f"Elapsed time converting to dataframe: {time.time() - start_time}")
-    
+    logger.info(f"Elapsed time converting to dataframe sequentially: {time.time() - start_time}")
+
+    return df_state, df_event, df_comm
+
+
+def isplit(iterable, part_size, group=list):
+    """ Yields groups of length `part_size` of items found in iterator.
+    group is a constructor which transforms an iterator into a object
+    with `part_size` or less elements (example: list, tuple or set)
+    """
+    iterator = iter(iterable)
+    while True:
+        tmp = group(itertools.islice(iterator, 0, part_size))
+        if not tmp:
+            return
+        yield tmp
+
+
+def get_records(line_chunk):
+    df_state = []
+    df_event = []
+    df_comm = []
+    for line in line_chunk:
+        row, record_t = get_row(line)
+        if record_t == STATE_RECORD:
+            df_state.append(row)
+        elif record_t == EVENT_RECORD:
+            df_event.extend(row)
+        elif record_t == COMM_RECORD:
+            df_comm.append(row)
+        else:
+            pass
+    return df_state, df_event, df_comm
+
+
+def reduce_dfs(chunk_a, chunk_b):
+    chunk_a[0].extend(chunk_b[0])
+    chunk_a[1].extend(chunk_b[1])
+    chunk_a[2].extend(chunk_b[2])
+    return chunk_a
+
+
+def load_as_dataframe2(file):
+    with open(file, "r") as f:
+        # Discard the header
+        f.readline()
+        # Read records
+        lines = read_lines(f, bytes=MAX_READ_BYTES)
+    part_size = 1000
+    start_time = time.time()
+    with ProcessPoolExecutor() as executor:
+        parsed = executor.map(get_records, isplit(lines, part_size))
+
+    state_result, event_result, comm_result = reduce(reduce_dfs, parsed)
+
+    # logger.info(f"Elapsed parsing time: {time.time() - start_time}")
+
+    start_time = time.time()
+    df_state = pd.DataFrame(state_result, columns=COL_STATE_RECORD)
+    df_event = pd.DataFrame(event_result, columns=COL_EVENT_RECORD)
+    df_comm = pd.DataFrame(comm_result, columns=COL_COMM_RECORD)
+    logger.info(f"Elapsed time converting to dataframe in parallel: {time.time() - start_time}")
+
     return df_state, df_event, df_comm
 
 
 def test():
-    #TraceMetaData = parse_file(TRACE)
-    df_state, df_event, df_comm = load_as_dataframe(TRACE_HUGE)
-    #pd.set_option("display.max_rows", None)
+    # TraceMetaData = parse_file(TRACE)
+    df_state, df_event, df_comm = load_as_dataframe2(TRACE)
+    # pd.set_option("display.max_rows", None)
     logger.info(f"\nResulting Event records data:\n {df_state.shape}")
     logger.info(f"\nResulting Event records data:\n {df_event.shape}")
     logger.info(f"\nResulting Comm. records data:\n {df_comm.shape}")
+
+    df_state2, df_event2, df_comm2 = load_as_dataframe(TRACE)
+    print(df_comm == df_comm2)
+    print(df_state == df_state2)
+    print(df_event == df_event2)
 
 
 if __name__ == "__main__":
