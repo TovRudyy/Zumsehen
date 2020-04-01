@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import sys
+from time import perf_counter
 
 import numpy as np
 import pandas as pd
@@ -71,6 +72,7 @@ def load_prv(tracefile):
     # @TODO: need to implement storing data into dataframe(s)
     tracedata = pd.DataFrame()
 
+    starttime_body = perf_counter()
     # fileoffset in tracefile is at first line of body after reading header data here
     for line in tracefile:
         if line[0] == '#':
@@ -105,11 +107,14 @@ def load_prv(tracefile):
         else:
             logging.warning('skipping record of unknown type "%s"', record_type)
             continue
+    endtime_body = perf_counter()
+    logging.info("Reading trace body took %s seconds", endtime_body - starttime_body)
     return header, tracedata
 
 
 def main(argv):
     #logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     filename = argv[1]
     with open(filename, 'r') as tracefile:
         header, tracedata = load_prv(tracefile)
