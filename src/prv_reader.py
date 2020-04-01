@@ -73,6 +73,8 @@ def load_prv(tracefile):
 
     # fileoffset in tracefile is at first line of body after reading header data here
     for line in tracefile:
+        if line[0] == '#':
+            continue
         record = line.strip().split(':')
         record_type = record[0]
         logging.debug("line to parse: %s", line.strip())
