@@ -45,8 +45,10 @@ COL_COMM_RECORD = [
     "tag",
 ]
 
-# TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
-TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
+MAX_READ_BYTES = None
+TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
+TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
+#TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
 
 
 # TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
@@ -75,7 +77,7 @@ def get_event_rows(line):
 
 def get_comm_row(line):
     row = list(map(int, line.split(":")))
-    logger.warning(f"Parsed comm. rows: {row}")
+    logger.debug(f"Parsed comm. rows: {row}")
     return row
 
 
@@ -125,31 +127,6 @@ def read_lines(file, bytes=None):
 
 # TODO: concatenate blocks of rows might be more efficient than append one by one
 def load_as_dataframe(file):
-    df_state_event = pd.DataFrame(columns=COL_STATE_EVENT_RECORD)
-    df_comm = pd.DataFrame(columns=COL_COMM_RECORD)
-    with open(file, "r") as f:
-        # Discard the header
-        f.readline()
-        # Read records
-        lines = read_lines(f)
-        start_time = time.time()
-        for numline, line in progressbar.progressbar(enumerate(lines), max_value=len(lines)):
-            # logger.info(f"Parsing line {numline + 2}: {line[:-1]}")
-            rows, record_t = get_rows(line)
-            if record_t == STATE_RECORD or record_t == EVENT_RECORD:
-                df_state_event = df_state_event.append(
-                    pd.DataFrame(rows, columns=COL_STATE_EVENT_RECORD), ignore_index=True
-                )
-            elif record_t == COMM_RECORD:
-                df_comm = df_comm.append(rows)
-            else:
-                # numline + 1 (header_line)
-                logger.warning(f"Invalid record type, skipping...")
-        logger.info(f"Elapsed parsing time: {time.time() - start_time}")
-    return df_state_event, df_comm
-
-
-def load_as_dataframe2(file):
     # df_state_event = pd.DataFrame(columns=COL_STATE_EVENT_RECORD)
     # df_comm = pd.DataFrame(columns=COL_COMM_RECORD)
     df_state_event = []
@@ -158,34 +135,31 @@ def load_as_dataframe2(file):
         # Discard the header
         f.readline()
         # Read records
-        lines = read_lines(f)
+        lines = read_lines(f, bytes=MAX_READ_BYTES)
         start_time = time.time()
         for numline, line in progressbar.progressbar(enumerate(lines), max_value=len(lines)):
             # logger.info(f"Parsing line {numline + 2}: {line[:-1]}")
             rows, record_t = get_rows(line)
             if record_t == STATE_RECORD or record_t == EVENT_RECORD:
-                df_state_event.append(rows)
+                df_state_event.extend(rows)
             elif record_t == COMM_RECORD:
                 df_comm.append(rows)
             else:
                 # numline + 1 (header_line)
                 logger.warning(f"Invalid record type, skipping...")
         logger.info(f"Elapsed parsing time: {time.time() - start_time}")
-
+        
     df_state_event = pd.DataFrame(df_state_event, columns=COL_STATE_EVENT_RECORD)
     df_comm = pd.DataFrame(df_comm, columns=COL_COMM_RECORD)
     return df_state_event, df_comm
 
 
 def test():
-    TraceMetaData = parse_file(TRACE)
-    df_state_event, df_comm = load_as_dataframe(TRACE)
-    pd.set_option("display.max_rows", None)
-    logger.debug(f"\nResulting State and Event records data:\n {df_state_event}")
-    logger.debug(f"\nResulting Comm. records data:\n{df_comm}")
-    df_state_event2, df_comm2 = load_as_dataframe2(TRACE)
-    print(df_state_event == df_state_event2)
-    print(df_comm == df_comm2)
+    TraceMetaData = parse_file(TRACE_HUGE)
+    df_state_event2, df_comm2 = load_as_dataframe(TRACE_HUGE)
+    #pd.set_option("display.max_rows", None)
+    logger.info(f"\nResulting State and Event records data:\n {df_state_event2.shape}")
+    logger.info(f"\nResulting Comm. records data:\n {df_comm2.shape}")
 
 
 if __name__ == "__main__":
