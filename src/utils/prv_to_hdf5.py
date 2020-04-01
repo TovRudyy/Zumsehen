@@ -2,6 +2,7 @@ import logging
 import time
 
 import pandas as pd
+import numpy as np
 import progressbar
 
 from src.reader import parse_file
@@ -125,9 +126,9 @@ def read_lines(file, bytes=None):
 def load_as_dataframe(file):
     # df_state_event = pd.DataFrame(columns=COL_STATE_EVENT_RECORD)
     # df_comm = pd.DataFrame(columns=COL_COMM_RECORD)
-    df_state = []
-    df_event = []
-    df_comm = []
+    df_state = np.array(ndim=2)
+    df_event = np.array(ndim=2)
+    df_comm = np.array(ndim=2)
     with open(file, "r") as f:
         # Discard the header
         f.readline()
