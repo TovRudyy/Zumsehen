@@ -7,6 +7,36 @@ from time import perf_counter
 
 import pandas as pd
 
+COL_STATE_EVENT_RECORD = [
+    "record_type",
+    "cpu_id",
+    "app_id",
+    "task_id",
+    "thread_id",
+    "time_start",
+    "time_end",
+    "state",
+    "event_type",
+    "event_value",
+]
+COL_COMM_RECORD = [
+    "record_type",
+    "cpu_send_id",
+    "ptask_send_id",
+    "task_send_id",
+    "thread_send_id",
+    "lsend",
+    "psend",
+    "cpu_recv_id",
+    "ptask_recv_id",
+    "task_recv_id",
+    "thread_recv_id",
+    "lrecv",
+    "precv",
+    "size",
+    "tag",
+]
+
 
 def load_prv(tracefile):
     # read trace header
@@ -65,7 +95,31 @@ def load_prv(tracefile):
 
     # read trace body
     # @TODO: need to implement storing data into dataframe(s)
-    tracedata = pd.DataFrame()
+
+    STATE_FIELDS = ["record_type", "cpu_id", "appl_id", "task_id", "thread_id", "begin_time", "end_time", "state"]
+    state_record_list = []
+
+    EVENT_FIELDS = ["record_type", "cpu_id", "appl_id", "task_id", "thread_id", "time", "event_type", "event_value"]
+    event_record_list = []
+
+    COMMUNICATION_FIELDS = [
+        "record_type",
+        "cpu_send_id",
+        "ptask_send_id",
+        "task_send_id",
+        "thread_send_id",
+        "lsend",
+        "psend",
+        "cpu_recv_id",
+        "ptask_recv_id",
+        "task_recv_id",
+        "thread_recv_id",
+        "lrecv",
+        "precv",
+        "size",
+        "tag",
+    ]
+    communication_record_list = []
 
     starttime_body = perf_counter()
     # fileoffset in tracefile is at first line of body after reading header data here
@@ -79,45 +133,47 @@ def load_prv(tracefile):
         if record_type == "1":
             # state record
             # 1:cpu_id:appl_id:task_id:thread_id:begin_time:end_time:state
-            _, cpu_id, appl_id, task_id, thread_id, begin_time, end_time, state = record
+            # record_type, cpu_id, appl_id, task_id, thread_id, begin_time, end_time, state = record
             # logging.debug("%s "*7, cpu_id, appl_id, task_id, thread_id, begin_time, end_time, state)
+            state_record_list.append(record)
         elif record_type == "2":
             # event record
-            _, cpu_id, appl_id, task_id, thread_id, time, *events = record
+            record_type, cpu_id, appl_id, task_id, thread_id, time, *events = record
             # logging.debug("%s "*5, cpu_id, appl_id, task_id, thread_id, time)
             event_iter = iter(events)
             for event_type in event_iter:
                 event_value = next(event_iter)
+                event_record_list.append(record[:6] + [event_type, event_value])
                 # logging.debug("%s %s", event_type, event_value)
         elif record_type == "3":
             # communication record
-            (
-                _,
-                cpu_send_id,
-                ptask_send_id,
-                task_send_id,
-                thread_send_id,
-                lsend,
-                psend,
-                cpu_recv_id,
-                ptask_recv_id,
-                task_recv_id,
-                thread_recv_id,
-                lrecv,
-                precv,
-                size,
-                tag,
-            ) = record
+            # record_type, \
+            # cpu_send_id, ptask_send_id, task_send_id, thread_send_id, lsend, psend, \
+            # cpu_recv_id, ptask_recv_id, task_recv_id, thread_recv_id, lrecv, precv, \
+            # size, tag = record
             # logging.debug("%s "*14,
             #         cpu_send_id, ptask_send_id, task_send_id, thread_send_id, lsend, psend,
             #         cpu_recv_id, ptask_recv_id, task_recv_id, thread_recv_id, lrecv, precv,
             #         size, tag)
+            communication_record_list.append(record)
         else:
             logging.warning('skipping record of unknown type "%s"', record_type)
             continue
     endtime_body = perf_counter()
     logging.info("Reading trace body took %s seconds", endtime_body - starttime_body)
-    return header, tracedata
+    logging.info("# state records: %s", len(state_record_list))
+    logging.info("# event records: %s", len(event_record_list))
+    logging.info("# communication records: %s", len(communication_record_list))
+    starttime_pandas = perf_counter()
+    returnvalues = {
+        "header": header,
+        "state_records": pd.DataFrame(state_record_list, columns=STATE_FIELDS),
+        "event_records": pd.DataFrame(event_record_list, columns=EVENT_FIELDS),
+        "communication_records": pd.DataFrame(communication_record_list, columns=COMMUNICATION_FIELDS),
+    }
+    endtime_pandas = perf_counter()
+    logging.info("Converting data to pandas DataFrames took %s seconds", endtime_pandas - starttime_pandas)
+    return returnvalues
 
 
 def main(argv):
@@ -125,8 +181,19 @@ def main(argv):
     logging.basicConfig(level=logging.INFO)
     filename = argv[1]
     with open(filename, "r") as tracefile:
-        header, tracedata = load_prv(tracefile)
-        print(json.dumps(header))
+        tracedata = load_prv(tracefile)
+        print("HEADER")
+        print("-" * 78)
+        print(json.dumps(tracedata["header"]))
+        print("STATES")
+        print("-" * 78)
+        print(tracedata["state_records"])
+        print("EVENTS")
+        print("-" * 78)
+        print(tracedata["event_records"])
+        print("COMMUNICATION")
+        print("-" * 78)
+        print(tracedata["communication_records"])
 
     return 0
 
