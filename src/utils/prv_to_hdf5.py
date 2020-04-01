@@ -15,8 +15,7 @@ STATE_RECORD = 1
 EVENT_RECORD = 2
 COMM_RECORD = 3
 
-COL_STATE_EVENT_RECORD = [
-    "record_t",
+COL_STATE_RECORD = [
     "cpu_id",
     "appl_id",
     "task_id",
@@ -24,11 +23,17 @@ COL_STATE_EVENT_RECORD = [
     "time_ini",
     "time_fi",
     "state",
+]
+COL_EVENT_RECORD = [
+    "cpu_id",
+    "appl_id",
+    "task_id",
+    "thread_id",
+    "time",
     "event_t",
     "event_val",
 ]
 COL_COMM_RECORD = [
-    "record_t",
     "cpu_send_id",
     "ptask_send_id",
     "task_send_id",
@@ -47,42 +52,32 @@ COL_COMM_RECORD = [
 
 MAX_READ_BYTES = None
 TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
-TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
+TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
 #TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
 
 
 # TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
-def get_state_rows(line):
-    rows = []
-    row = list(map(int, line.split(":"))) + [None, None]
-    rows.append(row)
-    logger.debug(f"Parsed state rows: {rows}")
-    return rows
+def get_state_row(line):
+    # We discard the record type field
+    return list(map(int, line.split(":")))[1:]
 
 
 def get_event_rows(line):
-    """ This function can return various rows because
-    one event record line can contain multiple events """
-    rows = []
-    row = list(map(int, line.split(":")))
-    row = row[:6] + [row[5], None] + row[6:]
-    # rows = [row[0:7] + list(event_t, event_v) for event_t, event_v in row[8:]]
-    event_iter = iter(row[8:])
-    for event_type in event_iter:
-        aux = row[:8] + [event_type, next(event_iter)]
-        rows.append(aux)
-    logger.debug(f"Parsed event rows: {rows}")
-    return rows
+    # We discard the record type field
+    row = list(map(int, line.split(":")))[1:]
+    event_iter = iter(row[5:])
+    # The same Event record line can contain more than 1 Event
+    return [row[:5] + [event, next(event_iter)] for event in event_iter]
 
 
 def get_comm_row(line):
-    row = list(map(int, line.split(":")))
-    logger.debug(f"Parsed comm. rows: {row}")
-    return row
+    # We discard the record type fied
+    return list(map(int, line.split(":")))[1:]
 
 
 def get_record_type(line):
-    record_t, _, other = line.partition(":")
+    # The record type should be a 1 size long numerical character
+    record_t = line[0]
     # Some records in the trace are not numerical
     try:
         record_t = int(record_t)
@@ -91,11 +86,11 @@ def get_record_type(line):
     return record_t
 
 
-def get_rows(line):
+def get_row(line):
     row = []
     record_t = get_record_type(line)
     if record_t == STATE_RECORD:
-        row = get_state_rows(line)
+        row = get_state_row(line)
     elif record_t == EVENT_RECORD:
         row = get_event_rows(line)
     elif record_t == COMM_RECORD:
@@ -107,6 +102,7 @@ def get_rows(line):
 
 
 def read_lines(file, bytes=None):
+    ''' Try to read 'bytes' bytes if defined, if not, read the entire file '''
     start_position = file.tell()
     if bytes is None:
         start_time = time.time()
@@ -129,7 +125,8 @@ def read_lines(file, bytes=None):
 def load_as_dataframe(file):
     # df_state_event = pd.DataFrame(columns=COL_STATE_EVENT_RECORD)
     # df_comm = pd.DataFrame(columns=COL_COMM_RECORD)
-    df_state_event = []
+    df_state = []
+    df_event = []
     df_comm = []
     with open(file, "r") as f:
         # Discard the header
@@ -137,29 +134,34 @@ def load_as_dataframe(file):
         # Read records
         lines = read_lines(f, bytes=MAX_READ_BYTES)
         start_time = time.time()
-        for numline, line in progressbar.progressbar(enumerate(lines), max_value=len(lines)):
-            # logger.info(f"Parsing line {numline + 2}: {line[:-1]}")
-            rows, record_t = get_rows(line)
-            if record_t == STATE_RECORD or record_t == EVENT_RECORD:
-                df_state_event.extend(rows)
+        for line in progressbar.progressbar(lines, max_value=len(lines)):
+            row, record_t = get_row(line)
+            if record_t == STATE_RECORD:
+                df_state.append(row)
+            elif record_t == EVENT_RECORD:
+                df_event.extend(row)
             elif record_t == COMM_RECORD:
-                df_comm.append(rows)
+                df_comm.append(row)
             else:
-                # numline + 1 (header_line)
                 logger.warning(f"Invalid record type, skipping...")
         logger.info(f"Elapsed parsing time: {time.time() - start_time}")
         
-    df_state_event = pd.DataFrame(df_state_event, columns=COL_STATE_EVENT_RECORD)
+    start_time = time.time()
+    df_state = pd.DataFrame(df_state, columns=COL_STATE_RECORD)
+    df_event = pd.DataFrame(df_event, columns=COL_EVENT_RECORD)
     df_comm = pd.DataFrame(df_comm, columns=COL_COMM_RECORD)
-    return df_state_event, df_comm
+    logger.info(f"Elapsed time converting to dataframe: {time.time() - start_time}")
+    
+    return df_state, df_event, df_comm
 
 
 def test():
-    TraceMetaData = parse_file(TRACE_HUGE)
-    df_state_event2, df_comm2 = load_as_dataframe(TRACE_HUGE)
+    #TraceMetaData = parse_file(TRACE)
+    df_state, df_event, df_comm = load_as_dataframe(TRACE_HUGE)
     #pd.set_option("display.max_rows", None)
-    logger.info(f"\nResulting State and Event records data:\n {df_state_event2.shape}")
-    logger.info(f"\nResulting Comm. records data:\n {df_comm2.shape}")
+    logger.info(f"\nResulting Event records data:\n {df_state.shape}")
+    logger.info(f"\nResulting Event records data:\n {df_event.shape}")
+    logger.info(f"\nResulting Comm. records data:\n {df_comm.shape}")
 
 
 if __name__ == "__main__":
