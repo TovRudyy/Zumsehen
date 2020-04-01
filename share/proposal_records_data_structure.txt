@@ -18,7 +18,7 @@ Format of Communication records:
 Poposed data structures to hold records:
     - SQL Data Base
         - States and Events data base:
-            id:long, record_t:int, cpu_id:int, appl_id:int, thread_id:int, time_ini:long, time_fi:long, state:int, event_t:long, event_val:long
+            id:long, record_t:int, cpu_id:int, appl_id:int, task_id:int, thread_id:int, time_ini:long, time_fi:long, state:int, event_t:long, event_val:long
                 Rules:
                     * one row can only contain one record type (one state or one event)
                     * when containing one state, the event values must be null

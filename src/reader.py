@@ -68,15 +68,18 @@ def paraver_header_parser(header):
 
 
 def parse_file(file):
-    with open(file) as f:
-        header = f.readline()
-        if PARAVER_MAGIC_HEADER not in header:
-            logger.error(f"The file {f.name} is not a valid Paraver file!")
+    try:
+        with open(file) as f:
+            header = f.readline()
+            if PARAVER_MAGIC_HEADER not in header:
+                logger.error(f"The file {f.name} is not a valid Paraver file!")
 
-        trace_name = os.path.basename(f.name)
-        trace_path = os.path.abspath(f.name)
-        trace_type = PARAVER_FILE
+            trace_name = os.path.basename(f.name)
+            trace_path = os.path.abspath(f.name)
+            trace_type = PARAVER_FILE
 
-        trace_exec_time, trace_date, trace_nodes, trace_apps = paraver_header_parser(header)
+            trace_exec_time, trace_date, trace_nodes, trace_apps = paraver_header_parser(header)
+    except:
+        logger.error(f"Not able to access the file {file}")
 
-        return TraceMetaData(trace_name, trace_path, trace_type, trace_exec_time, trace_date, trace_nodes, trace_apps)
+    return TraceMetaData(trace_name, trace_path, trace_type, trace_exec_time, trace_date, trace_nodes, trace_apps)
