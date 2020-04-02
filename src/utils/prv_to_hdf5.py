@@ -54,13 +54,16 @@ MB = 1024 * 1024
 GB = 1024 * 1024 * 1024
 MAX_READ_BYTES = GB * 4
 MAX_READ_BYTES_PARALLEL = MAX_READ_BYTES // 8
-BLOCK_LINE = 500
+BLOCK_LINE = 250000
 
 
-def get_state_or_comm_row(line):
+def get_state_row(line):
     # We discard the record type field
     return [int(x) for x in line.split(":")][1:]
 
+def get_comm_row(line):
+    # We discard the record type field
+    return [int(x) for x in line.split(":")][1:]
 
 def get_event_rows(line):
     # We discard the record type field
@@ -82,12 +85,15 @@ def parse_lines_as_list(lines):
 
     for line in lines:
         record_type = get_record_type(line)
-        if record_type == STATE_RECORD or record_type == COMM_RECORD:
-            record = get_state_or_comm_row(line)
+        if record_type == STATE_RECORD:
+            record = get_state_row(line)
             lstate.append(record)
         elif record_type == EVENT_RECORD:
             record = get_event_rows(line)
             levent.extend(record)
+        elif record_type == COMM_RECORD:
+            record = get_comm_row(line)
+            lcomm.append(record)
         else:
             pass
     return [lstate, levent, lcomm]
@@ -100,7 +106,7 @@ def parse_lines_to_nparray(lines):
         if parsed_lines is None:
             parsed_lines = [np.array(array) for array in parse_lines_as_list(block_lines)]
         else:
-            parsed_lines = np.concatenate([parsed_lines, parse_lines_as_list(block_lines)])
+            parsed_lines = [np.concatenate([parsed_lines[i], array]) for i, array in enumerate(parse_lines_as_list(block_lines))]
     return parsed_lines
 
 
@@ -160,8 +166,8 @@ def isplit(iterable, part_size, group=list):
         yield tmp
 
 
-TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
-# TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
+# TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
+TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
 # TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
 # TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
 
@@ -171,9 +177,10 @@ def test():
     # df_state, df_event, df_comm = parallel_parse_as_dataframe(TRACE_HUGE)
     df_state, df_event, df_comm = seq_parse_as_dataframe(TRACE)
     # pd.set_option("display.max_rows", None)
-    logger.info(f"\nResulting Event records data:\n {df_state.shape}")
+    logger.info(f"\nResulting State records data:\n {df_state.shape}")
     logger.info(f"\nResulting Event records data:\n {df_event.shape}")
     logger.info(f"\nResulting Comm. records data:\n {df_comm.shape}")
+    logger.info(f"Header State records data\n {df_state[-20:]}")
 
     # df_state2, df_event2, df_comm2 = load_as_dataframe(TRACE_HUGE)
     # print(df_comm == df_comm2)

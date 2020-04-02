@@ -38,8 +38,10 @@ def header_test_data():
                 header = input.readline()
             with open(f"{input.name[:-2]}sol.json", "r") as output:
                 sol = json.load(output)
-                
-            data.append((header, (sol["ExecTime"], datetime.strptime(sol["Date"], "%d/%m/%Y %H:%M"), sol["Nodes"], sol["Apps"])))
+
+            data.append(
+                (header, (sol["ExecTime"], datetime.strptime(sol["Date"], "%d/%m/%Y %H:%M"), sol["Nodes"], sol["Apps"]))
+            )
         else:
             pass
     return data
