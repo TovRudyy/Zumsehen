@@ -12,4 +12,4 @@ format:
 
 .PHONY: test
 test:
-	pytest -sv test $(ARGS)
+	pytest -svv test $(ARGS)

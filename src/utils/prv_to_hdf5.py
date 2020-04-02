@@ -53,8 +53,8 @@ COL_COMM_RECORD = [
 MB = 1024 * 1024
 GB = 1024 * 1024 * 1024
 MAX_READ_BYTES = GB * 4
-MAX_READ_BYTES_PARALLEL = MB * 50
-BLOCK_LINE = 500000
+MAX_READ_BYTES_PARALLEL = MAX_READ_BYTES // 8
+BLOCK_LINE = 500
 
 
 def get_state_or_comm_row(line):
@@ -160,15 +160,16 @@ def isplit(iterable, part_size, group=list):
         yield tmp
 
 
-# TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
+TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
 # TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
-TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
+# TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
 # TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
 
 
 def test():
     # TraceMetaData = parse_file(TRACE)
-    df_state, df_event, df_comm = parallel_parse_as_dataframe(TRACE)
+    # df_state, df_event, df_comm = parallel_parse_as_dataframe(TRACE_HUGE)
+    df_state, df_event, df_comm = seq_parse_as_dataframe(TRACE)
     # pd.set_option("display.max_rows", None)
     logger.info(f"\nResulting Event records data:\n {df_state.shape}")
     logger.info(f"\nResulting Event records data:\n {df_event.shape}")

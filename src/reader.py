@@ -16,14 +16,12 @@ PARAVER_MAGIC_HEADER = "#Paraver"
 def prv_header_date(header):
     date, _, other = header.replace("#Paraver (", "").replace("at ", "").partition("):")
     date = datetime.strptime(date, "%d/%m/%Y %H:%M")
-    logger.debug(f"date = {date}")
     return date
 
 
 def prv_header_time(header):
     time, _, other = header[header.find("):") + 2 :].partition("_ns")
     time = int(time)
-    logger.debug(f"time = {time}")
     return time
 
 
@@ -35,7 +33,6 @@ def prv_header_nodes(header):
         nodes = nodes[nodes.find("(") + 1 : nodes.find(")")]
         nodes = nodes.split(",")
         nodes = list(map(int, nodes))
-    logger.debug(f"Nodes = {nodes}")
     return nodes
 
 
@@ -60,7 +57,6 @@ def prv_header_apps(header):
         apps_list.append(tasks_list)
         i += 1
         apps, _, other = other.partition(":")
-    logger.debug(f"Applications: {apps_list}")
     return apps_list
 
 

@@ -1,0 +1,6 @@
+{
+    "ExecTime": 4573,
+    "Date": "02/06/1997 00:00",
+    "Nodes": null,
+    "Apps": [[{"nThreads": 4, "node": 0},{"nThreads": 3, "node": 0}], [{"nThreads": 1, "node": 0}, {"nThreads": 1, "node": 0}, {"nThreads": 2, "node": 0}], [{"nThreads": 48, "node":0}], [{"nThreads": 12, "node": 0}, {"nThreads": 12, "node": 0}]]
+}
