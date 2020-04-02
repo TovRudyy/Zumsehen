@@ -59,6 +59,7 @@ def prv_header_apps(header):
             j += 1
         apps_list.append(tasks_list)
         i += 1
+        apps, _, other = other.partition(":")
     logger.debug(f"Applications: {apps_list}")
     return apps_list
 
