@@ -1,10 +1,9 @@
 import logging
-import os
 from datetime import datetime
 
 import pytest
 
-from src.reader import paraver_header_parser, parse_file
+from src.reader import paraver_header_parser
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)

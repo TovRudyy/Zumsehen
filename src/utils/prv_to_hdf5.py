@@ -4,11 +4,7 @@ import time
 from concurrent.futures.process import ProcessPoolExecutor
 from functools import reduce
 
-import pandas as pd
 import numpy as np
-import progressbar
-
-from src.reader import parse_file
 
 logger = logging.getLogger(__name__)
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
@@ -54,10 +50,10 @@ COL_COMM_RECORD = [
     "tag",
 ]
 
-MB = 1024*1024
-GB = 1024*1024*1024
-MAX_READ_BYTES = GB*4
-MAX_READ_BYTES_PARALLEL = MB*50
+MB = 1024 * 1024
+GB = 1024 * 1024 * 1024
+MAX_READ_BYTES = GB * 4
+MAX_READ_BYTES_PARALLEL = MB * 50
 BLOCK_LINE = 500000
 
 
@@ -98,7 +94,7 @@ def parse_lines_as_list(lines):
 
 
 def parse_lines_to_nparray(lines):
-    ''' Parse 'lines' lines to numpy.array(s) in batches of 'block' lines'''
+    """ Parse 'lines' lines to numpy.array(s) in batches of 'block' lines"""
     parsed_lines = None
     for block_lines in isplit(lines, BLOCK_LINE):
         if parsed_lines is None:
@@ -167,12 +163,13 @@ def isplit(iterable, part_size, group=list):
 # TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
 # TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
 TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
-#TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
+# TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
+
 
 def test():
     # TraceMetaData = parse_file(TRACE)
     df_state, df_event, df_comm = parallel_parse_as_dataframe(TRACE)
-    #pd.set_option("display.max_rows", None)
+    # pd.set_option("display.max_rows", None)
     logger.info(f"\nResulting Event records data:\n {df_state.shape}")
     logger.info(f"\nResulting Event records data:\n {df_event.shape}")
     logger.info(f"\nResulting Comm. records data:\n {df_comm.shape}")
