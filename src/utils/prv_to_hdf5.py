@@ -54,13 +54,16 @@ COL_COMM_RECORD = [
     "tag",
 ]
 
+MB = 1024*1024
 GB = 1024*1024*1024
 MAX_READ_BYTES = GB*4
+MAX_READ_BYTES_PARALLEL = MB*50
 BLOCK_LINE = 500000
 
-def get_state_row(line):
+
+def get_state_or_comm_row(line):
     # We discard the record type field
-    return list(map(int, line.split(":")))[1:]
+    return [int(x) for x in line.split(":")][1:]
 
 
 def get_event_rows(line):
@@ -71,68 +74,10 @@ def get_event_rows(line):
     return [row[:5] + [event, next(event_iter)] for event in event_iter]
 
 
-def get_comm_row(line):
-    # We discard the record type fied
-    return list(map(int, line.split(":")))[1:]
-
-
 def get_record_type(line):
     # The record type should be a 1 size long numerical character
     return line[0]
 
-
-def parse_line(line):
-    row = []
-    record_t = get_record_type(line)
-    if record_t == STATE_RECORD or record_t == COMM_RECORD:
-        row = list(map(int, line.split(":")))[1:]
-    elif record_t == EVENT_RECORD:
-        row = list(map(int, line.split(":")))[1:]
-        event_iter = iter(row[5:])
-        row = [row[:5] + [event, next(event_iter)] for event in event_iter]
-    else:
-        pass
-
-    return row, record_t
-
-
-def read_lines(file, bytes=None):
-    ''' Try to read 'bytes' bytes if defined, if not, read the entire file '''
-    start_position = file.tell()
-    if bytes is None:
-        start_time = time.time()
-        lines = file.readlines()
-        elapsed = time.time() - start_time
-        size = (file.tell() - start_position) / (1024 * 1024)
-    else:
-        start_time = time.time()
-        lines = file.readlines(bytes)
-        elapsed = time.time() - start_time
-        size = bytes / (1024 * 1024)
-        
-    return lines
-
-def parse_lines_as_list_inline(lines):
-    
-    lstate = []
-    levent = []
-    lcomm = []
-
-    for line in lines:
-        record_type = line[0]
-        record = line.split(":")[1:]
-        if record_type == STATE_RECORD:
-            lstate.append(line.split(":")[1:])
-        elif record_type == EVENT_RECORD:
-            record = line.split(":")[1:]
-            event_iter = iter(record[5:])
-            record = [record[:5] + [event, next(event_iter)] for event in event_iter]
-            levent.extend(record)
-        elif record_type == COMM_RECORD:
-            lcomm.append(line.split(":")[1:])
-        else:
-            pass
-    return [lstate, levent, lcomm]
 
 def parse_lines_as_list(lines):
     lstate = []
@@ -140,50 +85,69 @@ def parse_lines_as_list(lines):
     lcomm = []
 
     for line in lines:
-        record, record_type = parse_line(line)
-        if record_type == STATE_RECORD:
+        record_type = get_record_type(line)
+        if record_type == STATE_RECORD or record_type == COMM_RECORD:
+            record = get_state_or_comm_row(line)
             lstate.append(record)
         elif record_type == EVENT_RECORD:
+            record = get_event_rows(line)
             levent.extend(record)
-        elif record_type == COMM_RECORD:
-            lcomm.append(record)
         else:
             pass
     return [lstate, levent, lcomm]
 
-def parse_lines_to_nparray(lines, block):
-    ''' Parse 'lines' lines to numpy.array(s) in batches of 'block' lines'''
-    # arrays[0] -> STATES, arrays[1] -> EVENTS, arrays[2] -> COMM.
-    arrays = [np.array(array) for array in parse_lines_as_list(lines[:block])]
-    lines = lines[block:]
-    while (len(lines) > 0):
-        arrays = [np.concatenate([arrays[i], np.array(array)]) for i, array in enumerate(parse_lines_as_list(lines[:block]))]
-        lines = lines[block:]
-    return arrays
 
-def seq_parse_as_dataframe(file):
-    with open(file, "r") as f:
+def parse_lines_to_nparray(lines):
+    ''' Parse 'lines' lines to numpy.array(s) in batches of 'block' lines'''
+    parsed_lines = None
+    for block_lines in isplit(lines, BLOCK_LINE):
+        if parsed_lines is None:
+            parsed_lines = [np.array(array) for array in parse_lines_as_list(block_lines)]
+        else:
+            parsed_lines = np.concatenate([parsed_lines, parse_lines_as_list(block_lines)])
+    return parsed_lines
+
+
+def chunk_reader(filename, read_bytes):
+    with open(filename, "r") as f:
         # Discard the header
         f.readline()
-        lines = f.readlines(MAX_READ_BYTES)
-        # Initialize the STATE, EVENT and COMM. numpy arrays
-        start_time = time.time()
-        df_s = parse_lines_to_nparray(lines, BLOCK_LINE)
-        # Read the file in batches of 'MAX_READ_BYTES' lines 
-        lines = f.readlines(MAX_READ_BYTES)
-        while (len(lines) > 0):
-            df_s = [np.concatenate([df_s[i], array]) for i, array in enumerate(parse_lines_to_nparray(lines, BLOCK_LINE))]
-            lines = f.readlines(MAX_READ_BYTES)
-        
-    logger.info(f"Elapsed parsing time: {time.time() - start_time} seconds")
+        while True:
+            chunk = f.readlines(read_bytes)
+            if not chunk:
+                break
+            yield chunk
+
+
+def seq_parse_as_dataframe(file):
+    parsed_file = None
     start_time = time.time()
-    df_state = df_s[0]
-    df_event = df_s[1]
-    df_comm = df_s[2]
-    # df_state = pd.DataFrame(df_state, columns=COL_STATE_RECORD)
-    # df_event = pd.DataFrame(df_event, columns=COL_EVENT_RECORD)
-    # df_comm = pd.DataFrame(df_comm, columns=COL_COMM_RECORD)
-    #logger.info(f"Elapsed time converting to dataframe sequentially: {time.time() - start_time}")
+    for chunk in chunk_reader(file, MAX_READ_BYTES):
+        if parsed_file is None:
+            parsed_file = parse_lines_to_nparray(chunk)
+        else:
+            parsed_file = np.concatenate([parsed_file, parse_lines_to_nparray(chunk)])
+
+    df_state = parsed_file[0]
+    df_event = parsed_file[1]
+    df_comm = parsed_file[2]
+
+    print(f"Total time: {time.time() - start_time}")
+    return df_state, df_event, df_comm
+
+
+def parallel_parse_as_dataframe(file):
+    start_time = time.time()
+    with ProcessPoolExecutor() as executor:
+        parsed_file = executor.map(parse_lines_to_nparray, chunk_reader(file, MAX_READ_BYTES_PARALLEL))
+
+    parsed_file = reduce(np.concatenate, parsed_file)
+
+    df_state = parsed_file[0]
+    df_event = parsed_file[1]
+    df_comm = parsed_file[2]
+
+    print(f"Total time: {time.time() - start_time}")
     return df_state, df_event, df_comm
 
 
@@ -200,61 +164,14 @@ def isplit(iterable, part_size, group=list):
         yield tmp
 
 
-def get_records(line_chunk):
-    df_state = []
-    df_event = []
-    df_comm = []
-    for line in line_chunk:
-        row, record_t = parse_line(line)
-        if record_t == STATE_RECORD:
-            df_state.append(row)
-        elif record_t == EVENT_RECORD:
-            df_event.extend(row)
-        elif record_t == COMM_RECORD:
-            df_comm.append(row)
-        else:
-            pass
-    return np.array(df_state), np.array(df_event), np.array(df_comm)
-
-
-def reduce_dfs(chunk_a, chunk_b):
-    return np.concatenate([chunk_a[0], chunk_b[0]]), np.concatenate([chunk_a[1], chunk_b[1]]), np.concatenate([chunk_a[2], chunk_b[2]])
-
-
-def load_as_dataframe2(file):
-    with open(file, "r") as f:
-        # Discard the header
-        f.readline()
-        # Read records
-        lines = read_lines(f, bytes=MAX_READ_BYTES)
-    part_size = 200000
-    start_time = time.time()
-    with ProcessPoolExecutor() as executor:
-        parsed = executor.map(get_records, isplit(lines, part_size))
-
-    #state_result, event_result, comm_result = reduce(reduce_dfs, parsed)
-
-    print(f"Elapsed parsing time: {time.time() - start_time}")
-    # logger.info(f"Elapsed parsing time: {time.time() - start_time}")
-
-    start_time = time.time()
-    df_state = pd.DataFrame(state_result, columns=COL_STATE_RECORD)
-    df_event = pd.DataFrame(event_result, columns=COL_EVENT_RECORD)
-    df_comm = pd.DataFrame(comm_result, columns=COL_COMM_RECORD)
-    logger.info(f"Elapsed time converting to dataframe in parallel: {time.time() - start_time}")
-
-    return df_state, df_event, df_comm
-
-
-TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
-TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
-#TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
+# TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
+# TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
+TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
 #TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
 
 def test():
     # TraceMetaData = parse_file(TRACE)
-    #df_state, df_event, df_comm = load_as_dataframe2(TRACE_HUGE)
-    df_state, df_event, df_comm = seq_parse_as_dataframe(TRACE_HUGE)
+    df_state, df_event, df_comm = parallel_parse_as_dataframe(TRACE)
     #pd.set_option("display.max_rows", None)
     logger.info(f"\nResulting Event records data:\n {df_state.shape}")
     logger.info(f"\nResulting Event records data:\n {df_event.shape}")
