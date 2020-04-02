@@ -13,21 +13,21 @@ PARAVER_FILE = "Paraver (.prv)"
 PARAVER_MAGIC_HEADER = "#Paraver"
 
 
-def paraver_header_date(header):
+def prv_header_date(header):
     date, _, other = header.replace("#Paraver (", "").replace("at ", "").partition("):")
     date = datetime.strptime(date, "%d/%m/%Y %H:%M")
     logger.debug(f"date = {date}")
     return date
 
 
-def paraver_header_time(header):
+def prv_header_time(header):
     time, _, other = header[header.find("):") + 2 :].partition("_ns")
     time = int(time)
     logger.debug(f"time = {time}")
     return time
 
 
-def paraver_header_nodes(header):
+def prv_header_nodes(header):
     nodes = header[header.find("_ns:") + 4 :]
     if nodes[0] == "0":
         nodes = None
@@ -39,7 +39,7 @@ def paraver_header_nodes(header):
     return nodes
 
 
-def paraver_header_apps(header):
+def prv_header_apps(header):
     apps_list = []
     apps = header[header.find("_ns:") + 4 :]
     apps, _, other = apps.partition(":")
@@ -63,11 +63,11 @@ def paraver_header_apps(header):
     return apps_list
 
 
-def paraver_header_parser(header):
-    header_time = paraver_header_time(header)
-    header_date = paraver_header_date(header)
-    header_nodes = paraver_header_nodes(header)
-    header_apps = paraver_header_apps(header)
+def prv_header_parser(header):
+    header_time = prv_header_time(header)
+    header_date = prv_header_date(header)
+    header_nodes = prv_header_nodes(header)
+    header_apps = prv_header_apps(header)
     return header_time, header_date, header_nodes, header_apps
 
 
@@ -82,7 +82,7 @@ def parse_file(file):
             trace_path = os.path.abspath(f.name)
             trace_type = PARAVER_FILE
 
-            trace_exec_time, trace_date, trace_nodes, trace_apps = paraver_header_parser(header)
+            trace_exec_time, trace_date, trace_nodes, trace_apps = prv_header_parser(header)
     except:
         logger.error(f"Not able to access the file {file}")
 

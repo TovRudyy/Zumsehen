@@ -4,8 +4,8 @@ import time
 from concurrent.futures.process import ProcessPoolExecutor
 from functools import reduce
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import progressbar
 
 from src.reader import parse_file
@@ -54,9 +54,10 @@ COL_COMM_RECORD = [
     "tag",
 ]
 
-GB = 1024*1024*1024
-MAX_READ_BYTES = GB*4
+GB = 1024 * 1024 * 1024
+MAX_READ_BYTES = GB * 4
 BLOCK_LINE = 500000
+
 
 def get_state_row(line):
     # We discard the record type field
@@ -97,7 +98,7 @@ def parse_line(line):
 
 
 def read_lines(file, bytes=None):
-    ''' Try to read 'bytes' bytes if defined, if not, read the entire file '''
+    """ Try to read 'bytes' bytes if defined, if not, read the entire file """
     start_position = file.tell()
     if bytes is None:
         start_time = time.time()
@@ -109,11 +110,12 @@ def read_lines(file, bytes=None):
         lines = file.readlines(bytes)
         elapsed = time.time() - start_time
         size = bytes / (1024 * 1024)
-        
+
     return lines
 
+
 def parse_lines_as_list_inline(lines):
-    
+
     lstate = []
     levent = []
     lcomm = []
@@ -134,6 +136,7 @@ def parse_lines_as_list_inline(lines):
             pass
     return [lstate, levent, lcomm]
 
+
 def parse_lines_as_list(lines):
     lstate = []
     levent = []
@@ -151,15 +154,19 @@ def parse_lines_as_list(lines):
             pass
     return [lstate, levent, lcomm]
 
+
 def parse_lines_to_nparray(lines, block):
-    ''' Parse 'lines' lines to numpy.array(s) in batches of 'block' lines'''
+    """ Parse 'lines' lines to numpy.array(s) in batches of 'block' lines"""
     # arrays[0] -> STATES, arrays[1] -> EVENTS, arrays[2] -> COMM.
     arrays = [np.array(array) for array in parse_lines_as_list(lines[:block])]
     lines = lines[block:]
-    while (len(lines) > 0):
-        arrays = [np.concatenate([arrays[i], np.array(array)]) for i, array in enumerate(parse_lines_as_list(lines[:block]))]
+    while len(lines) > 0:
+        arrays = [
+            np.concatenate([arrays[i], np.array(array)]) for i, array in enumerate(parse_lines_as_list(lines[:block]))
+        ]
         lines = lines[block:]
     return arrays
+
 
 def seq_parse_as_dataframe(file):
     with open(file, "r") as f:
@@ -169,12 +176,14 @@ def seq_parse_as_dataframe(file):
         # Initialize the STATE, EVENT and COMM. numpy arrays
         start_time = time.time()
         df_s = parse_lines_to_nparray(lines, BLOCK_LINE)
-        # Read the file in batches of 'MAX_READ_BYTES' lines 
+        # Read the file in batches of 'MAX_READ_BYTES' lines
         lines = f.readlines(MAX_READ_BYTES)
-        while (len(lines) > 0):
-            df_s = [np.concatenate([df_s[i], array]) for i, array in enumerate(parse_lines_to_nparray(lines, BLOCK_LINE))]
+        while len(lines) > 0:
+            df_s = [
+                np.concatenate([df_s[i], array]) for i, array in enumerate(parse_lines_to_nparray(lines, BLOCK_LINE))
+            ]
             lines = f.readlines(MAX_READ_BYTES)
-        
+
     logger.info(f"Elapsed parsing time: {time.time() - start_time} seconds")
     start_time = time.time()
     df_state = df_s[0]
@@ -183,7 +192,7 @@ def seq_parse_as_dataframe(file):
     # df_state = pd.DataFrame(df_state, columns=COL_STATE_RECORD)
     # df_event = pd.DataFrame(df_event, columns=COL_EVENT_RECORD)
     # df_comm = pd.DataFrame(df_comm, columns=COL_COMM_RECORD)
-    #logger.info(f"Elapsed time converting to dataframe sequentially: {time.time() - start_time}")
+    # logger.info(f"Elapsed time converting to dataframe sequentially: {time.time() - start_time}")
     return df_state, df_event, df_comm
 
 
@@ -218,7 +227,11 @@ def get_records(line_chunk):
 
 
 def reduce_dfs(chunk_a, chunk_b):
-    return np.concatenate([chunk_a[0], chunk_b[0]]), np.concatenate([chunk_a[1], chunk_b[1]]), np.concatenate([chunk_a[2], chunk_b[2]])
+    return (
+        np.concatenate([chunk_a[0], chunk_b[0]]),
+        np.concatenate([chunk_a[1], chunk_b[1]]),
+        np.concatenate([chunk_a[2], chunk_b[2]]),
+    )
 
 
 def load_as_dataframe2(file):
@@ -232,7 +245,7 @@ def load_as_dataframe2(file):
     with ProcessPoolExecutor() as executor:
         parsed = executor.map(get_records, isplit(lines, part_size))
 
-    #state_result, event_result, comm_result = reduce(reduce_dfs, parsed)
+    # state_result, event_result, comm_result = reduce(reduce_dfs, parsed)
 
     print(f"Elapsed parsing time: {time.time() - start_time}")
     # logger.info(f"Elapsed parsing time: {time.time() - start_time}")
@@ -248,14 +261,15 @@ def load_as_dataframe2(file):
 
 TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
 TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
-#TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
-#TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
+# TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
+# TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
+
 
 def test():
     # TraceMetaData = parse_file(TRACE)
-    #df_state, df_event, df_comm = load_as_dataframe2(TRACE_HUGE)
+    # df_state, df_event, df_comm = load_as_dataframe2(TRACE_HUGE)
     df_state, df_event, df_comm = seq_parse_as_dataframe(TRACE_HUGE)
-    #pd.set_option("display.max_rows", None)
+    # pd.set_option("display.max_rows", None)
     logger.info(f"\nResulting Event records data:\n {df_state.shape}")
     logger.info(f"\nResulting Event records data:\n {df_event.shape}")
     logger.info(f"\nResulting Comm. records data:\n {df_comm.shape}")
