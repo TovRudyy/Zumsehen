@@ -15,9 +15,9 @@ FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
 logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.INFO)
 
-STATE_RECORD = 1
-EVENT_RECORD = 2
-COMM_RECORD = 3
+STATE_RECORD = "1"
+EVENT_RECORD = "2"
+COMM_RECORD = "3"
 
 COL_STATE_RECORD = [
     "cpu_id",
@@ -54,15 +54,10 @@ COL_COMM_RECORD = [
     "tag",
 ]
 
-MAX_READ_BYTES = None
-# TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
-# TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
+GB = 1024*1024*1024
+MAX_READ_BYTES = GB*4
+BLOCK_LINE = 500000
 
-
-TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
-
-
-# TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
 def get_state_row(line):
     # We discard the record type field
     return list(map(int, line.split(":")))[1:]
@@ -83,26 +78,20 @@ def get_comm_row(line):
 
 def get_record_type(line):
     # The record type should be a 1 size long numerical character
-    record_t = line[0]
-    # Some records in the trace are not numerical
-    try:
-        record_t = int(record_t)
-    except ValueError:
-        return record_t
-    return record_t
+    return line[0]
 
 
-def get_row(line):
+def parse_line(line):
     row = []
     record_t = get_record_type(line)
-    if record_t == STATE_RECORD:
-        row = get_state_row(line)
+    if record_t == STATE_RECORD or record_t == COMM_RECORD:
+        row = list(map(int, line.split(":")))[1:]
     elif record_t == EVENT_RECORD:
-        row = get_event_rows(line)
-    elif record_t == COMM_RECORD:
-        row = get_comm_row(line)
+        row = list(map(int, line.split(":")))[1:]
+        event_iter = iter(row[5:])
+        row = [row[:5] + [event, next(event_iter)] for event in event_iter]
     else:
-        logger.warning(f"The line contains an invalid record type: {record_t}")
+        pass
 
     return row, record_t
 
@@ -120,44 +109,81 @@ def read_lines(file, bytes=None):
         lines = file.readlines(bytes)
         elapsed = time.time() - start_time
         size = bytes / (1024 * 1024)
-
-    logger.info(
-        f"Has been read {'{:,.0f}'.format(size)} MB in {'{:.2f}'.format(elapsed)} seconds ({'{:.3f}'.format(size / elapsed)} MB/s)"
-    )
+        
     return lines
 
+def parse_lines_as_list_inline(lines):
+    
+    lstate = []
+    levent = []
+    lcomm = []
 
-# TODO: concatenate blocks of rows might be more efficient than append one by one
-def load_as_dataframe(file):
-    # df_state_event = pd.DataFrame(columns=COL_STATE_EVENT_RECORD)
-    # df_comm = pd.DataFrame(columns=COL_COMM_RECORD)
-    df_state = []
-    df_event = []
-    df_comm = []
+    for line in lines:
+        record_type = line[0]
+        record = line.split(":")[1:]
+        if record_type == STATE_RECORD:
+            lstate.append(line.split(":")[1:])
+        elif record_type == EVENT_RECORD:
+            record = line.split(":")[1:]
+            event_iter = iter(record[5:])
+            record = [record[:5] + [event, next(event_iter)] for event in event_iter]
+            levent.extend(record)
+        elif record_type == COMM_RECORD:
+            lcomm.append(line.split(":")[1:])
+        else:
+            pass
+    return [lstate, levent, lcomm]
+
+def parse_lines_as_list(lines):
+    lstate = []
+    levent = []
+    lcomm = []
+
+    for line in lines:
+        record, record_type = parse_line(line)
+        if record_type == STATE_RECORD:
+            lstate.append(record)
+        elif record_type == EVENT_RECORD:
+            levent.extend(record)
+        elif record_type == COMM_RECORD:
+            lcomm.append(record)
+        else:
+            pass
+    return [lstate, levent, lcomm]
+
+def parse_lines_to_nparray(lines, block):
+    ''' Parse 'lines' lines to numpy.array(s) in batches of 'block' lines'''
+    # arrays[0] -> STATES, arrays[1] -> EVENTS, arrays[2] -> COMM.
+    arrays = [np.array(array) for array in parse_lines_as_list(lines[:block])]
+    lines = lines[block:]
+    while (len(lines) > 0):
+        arrays = [np.concatenate([arrays[i], np.array(array)]) for i, array in enumerate(parse_lines_as_list(lines[:block]))]
+        lines = lines[block:]
+    return arrays
+
+def seq_parse_as_dataframe(file):
     with open(file, "r") as f:
         # Discard the header
         f.readline()
-        # Read records
-        lines = read_lines(f, bytes=MAX_READ_BYTES)
+        lines = f.readlines(MAX_READ_BYTES)
+        # Initialize the STATE, EVENT and COMM. numpy arrays
         start_time = time.time()
-        for line in progressbar.progressbar(lines, max_value=len(lines)):
-            row, record_t = get_row(line)
-            if record_t == STATE_RECORD:
-                df_state.append(row)
-            elif record_t == EVENT_RECORD:
-                df_event.extend(row)
-            elif record_t == COMM_RECORD:
-                df_comm.append(row)
-            else:
-                logger.warning(f"Invalid record type, skipping...")
-        logger.info(f"Elapsed parsing time: {time.time() - start_time}")
-
+        df_s = parse_lines_to_nparray(lines, BLOCK_LINE)
+        # Read the file in batches of 'MAX_READ_BYTES' lines 
+        lines = f.readlines(MAX_READ_BYTES)
+        while (len(lines) > 0):
+            df_s = [np.concatenate([df_s[i], array]) for i, array in enumerate(parse_lines_to_nparray(lines, BLOCK_LINE))]
+            lines = f.readlines(MAX_READ_BYTES)
+        
+    logger.info(f"Elapsed parsing time: {time.time() - start_time} seconds")
     start_time = time.time()
-    df_state = pd.DataFrame(df_state, columns=COL_STATE_RECORD)
-    df_event = pd.DataFrame(df_event, columns=COL_EVENT_RECORD)
-    df_comm = pd.DataFrame(df_comm, columns=COL_COMM_RECORD)
-    logger.info(f"Elapsed time converting to dataframe sequentially: {time.time() - start_time}")
-
+    df_state = df_s[0]
+    df_event = df_s[1]
+    df_comm = df_s[2]
+    # df_state = pd.DataFrame(df_state, columns=COL_STATE_RECORD)
+    # df_event = pd.DataFrame(df_event, columns=COL_EVENT_RECORD)
+    # df_comm = pd.DataFrame(df_comm, columns=COL_COMM_RECORD)
+    #logger.info(f"Elapsed time converting to dataframe sequentially: {time.time() - start_time}")
     return df_state, df_event, df_comm
 
 
@@ -179,7 +205,7 @@ def get_records(line_chunk):
     df_event = []
     df_comm = []
     for line in line_chunk:
-        row, record_t = get_row(line)
+        row, record_t = parse_line(line)
         if record_t == STATE_RECORD:
             df_state.append(row)
         elif record_t == EVENT_RECORD:
@@ -188,14 +214,11 @@ def get_records(line_chunk):
             df_comm.append(row)
         else:
             pass
-    return df_state, df_event, df_comm
+    return np.array(df_state), np.array(df_event), np.array(df_comm)
 
 
 def reduce_dfs(chunk_a, chunk_b):
-    chunk_a[0].extend(chunk_b[0])
-    chunk_a[1].extend(chunk_b[1])
-    chunk_a[2].extend(chunk_b[2])
-    return chunk_a
+    return np.concatenate([chunk_a[0], chunk_b[0]]), np.concatenate([chunk_a[1], chunk_b[1]]), np.concatenate([chunk_a[2], chunk_b[2]])
 
 
 def load_as_dataframe2(file):
@@ -204,13 +227,14 @@ def load_as_dataframe2(file):
         f.readline()
         # Read records
         lines = read_lines(f, bytes=MAX_READ_BYTES)
-    part_size = 1000
+    part_size = 200000
     start_time = time.time()
     with ProcessPoolExecutor() as executor:
         parsed = executor.map(get_records, isplit(lines, part_size))
 
-    state_result, event_result, comm_result = reduce(reduce_dfs, parsed)
+    #state_result, event_result, comm_result = reduce(reduce_dfs, parsed)
 
+    print(f"Elapsed parsing time: {time.time() - start_time}")
     # logger.info(f"Elapsed parsing time: {time.time() - start_time}")
 
     start_time = time.time()
@@ -222,18 +246,24 @@ def load_as_dataframe2(file):
     return df_state, df_event, df_comm
 
 
+TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
+TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
+#TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
+#TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
+
 def test():
     # TraceMetaData = parse_file(TRACE)
-    df_state, df_event, df_comm = load_as_dataframe2(TRACE)
-    # pd.set_option("display.max_rows", None)
+    #df_state, df_event, df_comm = load_as_dataframe2(TRACE_HUGE)
+    df_state, df_event, df_comm = seq_parse_as_dataframe(TRACE_HUGE)
+    #pd.set_option("display.max_rows", None)
     logger.info(f"\nResulting Event records data:\n {df_state.shape}")
     logger.info(f"\nResulting Event records data:\n {df_event.shape}")
     logger.info(f"\nResulting Comm. records data:\n {df_comm.shape}")
 
-    df_state2, df_event2, df_comm2 = load_as_dataframe(TRACE)
-    print(df_comm == df_comm2)
-    print(df_state == df_state2)
-    print(df_event == df_event2)
+    # df_state2, df_event2, df_comm2 = load_as_dataframe(TRACE_HUGE)
+    # print(df_comm == df_comm2)
+    # print(df_state == df_state2)
+    # print(df_event == df_event2)
 
 
 if __name__ == "__main__":
