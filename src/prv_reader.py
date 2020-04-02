@@ -13,8 +13,8 @@ COL_STATE_EVENT_RECORD = [
     "app_id",
     "task_id",
     "thread_id",
-    "time_start",
-    "time_end",
+    "time_ini",
+    "time_fi",
     "state",
     "event_type",
     "event_value",
@@ -96,10 +96,10 @@ def load_prv(tracefile):
     # read trace body
     # @TODO: need to implement storing data into dataframe(s)
 
-    STATE_FIELDS = ["record_type", "cpu_id", "appl_id", "task_id", "thread_id", "begin_time", "end_time", "state"]
+    STATE_FIELDS = ["record_type", "cpu_id", "appl_id", "task_id", "thread_id", "time_ini", "time_fi", "state"]
     state_record_list = []
 
-    EVENT_FIELDS = ["record_type", "cpu_id", "appl_id", "task_id", "thread_id", "time", "event_type", "event_value"]
+    EVENT_FIELDS = ["record_type", "cpu_id", "appl_id", "task_id", "thread_id", "time", "event_t", "event_v"]
     event_record_list = []
 
     COMMUNICATION_FIELDS = [
@@ -176,6 +176,21 @@ def load_prv(tracefile):
     return returnvalues
 
 
+def write_to_excel(file, tracedata):
+    writer = pd.ExcelWriter(f"{file}.parsed.xlsx")
+    tracedata["state_records"].drop(columns=["record_type"]).to_excel(writer, sheet_name="States")
+    tracedata["event_records"].drop(columns=["record_type"]).to_excel(writer, sheet_name="Events")
+    tracedata["communication_records"].drop(columns=["record_type"]).to_excel(writer, sheet_name="Comm")
+    writer.save()
+
+
+def write_to_hdf(file, tracedata):
+    file = f"{file}.parsed.hdf"
+    tracedata["state_records"].drop(columns=["record_type"]).to_hdf(file, key="States")
+    tracedata["event_records"].drop(columns=["record_type"]).to_hdf(file, key="Events")
+    tracedata["communication_records"].drop(columns=["record_type"]).to_hdf(file, key="Comm")
+
+
 def main(argv):
     # logging.basicConfig(level=logging.DEBUG)
     logging.basicConfig(level=logging.INFO)
@@ -195,6 +210,7 @@ def main(argv):
         print("-" * 78)
         print(tracedata["communication_records"])
 
+    write_to_hdf(argv[2], tracedata)
     return 0
 
 

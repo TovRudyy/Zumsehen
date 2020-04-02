@@ -29,8 +29,9 @@ def compare_trace_metadata(trace_a, trace_b):
 @pytest.fixture
 def header_test_data():
     data = []
-    os.chdir("test/test_files/headers")
-    for input in sorted(os.listdir("./")):
+    # os.chdir("test/test_files/headers")
+    for input in sorted(os.listdir("test/test_files/headers")):
+        input = "test/test_files/headers/" + input
         if "6.in" in input:
             header = None
             sol = None

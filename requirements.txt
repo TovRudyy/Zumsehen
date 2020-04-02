@@ -2,3 +2,5 @@ black
 flake8
 pytest
 pandas
+numpy
+xlrd

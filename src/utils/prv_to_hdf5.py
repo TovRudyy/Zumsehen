@@ -5,6 +5,7 @@ from concurrent.futures.process import ProcessPoolExecutor
 from functools import reduce
 
 import numpy as np
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
@@ -31,7 +32,7 @@ COL_EVENT_RECORD = [
     "thread_id",
     "time",
     "event_t",
-    "event_val",
+    "event_v",
 ]
 COL_COMM_RECORD = [
     "cpu_send_id",
@@ -61,9 +62,11 @@ def get_state_row(line):
     # We discard the record type field
     return [int(x) for x in line.split(":")][1:]
 
+
 def get_comm_row(line):
     # We discard the record type field
     return [int(x) for x in line.split(":")][1:]
+
 
 def get_event_rows(line):
     # We discard the record type field
@@ -106,7 +109,9 @@ def parse_lines_to_nparray(lines):
         if parsed_lines is None:
             parsed_lines = [np.array(array) for array in parse_lines_as_list(block_lines)]
         else:
-            parsed_lines = [np.concatenate([parsed_lines[i], array]) for i, array in enumerate(parse_lines_as_list(block_lines))]
+            parsed_lines = [
+                np.concatenate([parsed_lines[i], array]) for i, array in enumerate(parse_lines_as_list(block_lines))
+            ]
     return parsed_lines
 
 
@@ -130,9 +135,12 @@ def seq_parse_as_dataframe(file):
         else:
             parsed_file = np.concatenate([parsed_file, parse_lines_to_nparray(chunk)])
 
-    df_state = parsed_file[0]
-    df_event = parsed_file[1]
-    df_comm = parsed_file[2]
+    df_state = None if parsed_file[0].size == 0 else parsed_file[0]
+    df_state = pd.DataFrame(data=df_state, columns=COL_STATE_RECORD)[COL_STATE_RECORD]
+    df_event = None if parsed_file[1].size == 0 else parsed_file[1]
+    df_event = pd.DataFrame(data=df_event, columns=COL_EVENT_RECORD)[COL_EVENT_RECORD]
+    df_comm = None if parsed_file[2].size == 0 else parsed_file[2]
+    df_comm = pd.DataFrame(data=df_comm, columns=COL_COMM_RECORD)[COL_COMM_RECORD]
 
     print(f"Total time: {time.time() - start_time}")
     return df_state, df_event, df_comm
@@ -166,7 +174,7 @@ def isplit(iterable, part_size, group=list):
         yield tmp
 
 
-# TRACE = "/home/orudyy/Repositories/Zumsehen/traces/bt-mz.2x2-+A.x.prv"
+TRACE = "/home/orudyy/Repositories/Zumsehen/test/test_files/traces/bt-mz.2x2.test.prv"
 TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
 # TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
 # TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
@@ -175,12 +183,14 @@ TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps
 def test():
     # TraceMetaData = parse_file(TRACE)
     # df_state, df_event, df_comm = parallel_parse_as_dataframe(TRACE_HUGE)
-    df_state, df_event, df_comm = seq_parse_as_dataframe(TRACE)
+    df_state, df_event, df_comm = seq_parse_as_dataframe(
+        "/home/orudyy/Repositories/Zumsehen/test/test_files/traces/1MB.prv"
+    )
     # pd.set_option("display.max_rows", None)
     logger.info(f"\nResulting State records data:\n {df_state.shape}")
     logger.info(f"\nResulting Event records data:\n {df_event.shape}")
     logger.info(f"\nResulting Comm. records data:\n {df_comm.shape}")
-    logger.info(f"Header State records data\n {df_state[-20:]}")
+    # logger.info(f"Header State records data\n {df_state[-20:]}")
 
     # df_state2, df_event2, df_comm2 = load_as_dataframe(TRACE_HUGE)
     # print(df_comm == df_comm2)

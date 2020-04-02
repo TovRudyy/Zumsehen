@@ -1,0 +1,639 @@
+DEFAULT_OPTIONS
+
+LEVEL               THREAD
+UNITS               NANOSEC
+LOOK_BACK           100
+SPEED               1
+FLAG_ICONS          ENABLED
+NUM_OF_STATE_COLORS 1000
+YMAX_SCALE          37
+
+
+DEFAULT_SEMANTIC
+
+THREAD_FUNC          State As Is
+
+
+STATES
+0    Idle
+1    Running
+2    Not created
+3    Waiting a message
+4    Blocking Send
+5    Synchronization
+6    Test/Probe
+7    Scheduling and Fork/Join
+8    Wait/WaitAll
+9    Blocked
+10    Immediate Send
+11    Immediate Receive
+12    I/O
+13    Group Communication
+14    Tracing Disabled
+15    Others
+16    Send Receive
+17    Memory transfer
+18    Profiling
+19    On-line analysis
+20    Remote memory access
+21    Atomic memory operation
+22    Memory ordering operation
+23    Distributed locking
+24    Overhead
+25    One-sided op
+26    Startup latency
+27    Waiting links
+28    Data copy
+29    RTT
+30    Allocating memory
+31    Freeing memory
+
+
+STATES_COLOR
+0    {117,195,255}
+1    {0,0,255}
+2    {255,255,255}
+3    {255,0,0}
+4    {255,0,174}
+5    {179,0,0}
+6    {0,255,0}
+7    {255,255,0}
+8    {235,0,0}
+9    {0,162,0}
+10    {255,0,255}
+11    {100,100,177}
+12    {172,174,41}
+13    {255,144,26}
+14    {2,255,177}
+15    {192,224,0}
+16    {66,66,66}
+17    {255,0,96}
+18    {169,169,169}
+19    {169,0,0}
+20    {0,109,255}
+21    {200,61,68}
+22    {200,66,0}
+23    {0,41,0}
+24    {139,121,177}
+25    {116,116,116}
+26    {200,50,89}
+27    {255,171,98}
+28    {0,68,189}
+29    {52,43,0}
+30    {255,46,0}
+31    {100,216,32}
+
+
+EVENT_TYPE
+9   50000001    MPI Point-to-point
+VALUES
+4   MPI_Irecv
+3   MPI_Isend
+6   MPI_Waitall
+0   Outside MPI
+
+
+EVENT_TYPE
+9   50000002    MPI Collective Comm
+VALUES
+8   MPI_Barrier
+9   MPI_Reduce
+0   Outside MPI
+
+
+EVENT_TYPE
+9   50000003    MPI Other
+VALUES
+32   MPI_Finalize
+31   MPI_Init
+0   Outside MPI
+
+
+EVENT_TYPE
+1    50100001    Send Size in MPI Global OP
+1    50100002    Recv Size in MPI Global OP
+1    50100003    Root in MPI Global OP
+1    50100004    Communicator in MPI Global OP
+
+
+EVENT_TYPE
+0 60000001  Parallel (OMP)
+VALUES
+0 close
+1 DO (open)
+2 SECTIONS (open)
+3 REGION (open)
+
+EVENT_TYPE
+0    60000018    Executed OpenMP parallel function
+VALUES
+0   End
+1 Unresolved
+2 _NOT_Found
+3 x_solve_..omp_fn.0 [x_solve_._omp_fn.0]
+4 y_solve_..omp_fn.0 [y_solve_._omp_fn.0]
+5 z_solve_..omp_fn.0 [z_solve_._omp_fn.0]
+6 add_._omp_fn.0
+7 compute_..omp_fn.0 [compute_rhs_._omp_fn.0]
+8 copy_x_f..omp_fn.1 [copy_x_face_._omp_fn.1]
+9 copy_y_f..omp_fn.1 [copy_y_face_._omp_fn.1]
+10 copy_x_f..omp_fn.0 [copy_x_face_._omp_fn.0]
+11 copy_y_f..omp_fn.0 [copy_y_face_._omp_fn.0]
+12 MAIN__
+13 error_no..omp_fn.0 [error_norm_._omp_fn.0]
+14 rhs_norm..omp_fn.0 [rhs_norm_._omp_fn.0]
+
+
+EVENT_TYPE
+0    60000118    Executed OpenMP parallel function line and file
+VALUES
+0   End
+1 0 (Unresolved)
+2 0 (_NOT_Found)
+3 0 (add.f, bt-mz.A.x)
+4 0 (bt.f, bt-mz.A.x)
+5 0 (bt.f, bt-mz.A.x)
+6 0 (bt.f, bt-mz.A.x)
+7 0 (bt.f, bt-mz.A.x)
+8 0 (error.f, bt-mz.A.x)
+9 0 (error.f, bt-mz.A.x)
+10 0 (exch_qbc.f, bt-mz.A.x)
+11 0 (exch_qbc.f, bt-mz.A.x)
+12 0 (exch_qbc.f, bt-mz.A.x)
+13 0 (exch_qbc.f, bt-mz.A.x)
+14 0 (rhs.f, bt-mz.A.x)
+15 0 (x_solve.f, bt-mz.A.x)
+16 0 (y_solve.f, bt-mz.A.x)
+17 0 (z_solve.f, bt-mz.A.x)
+
+
+EVENT_TYPE
+0    60000023    Executed OpenMP task function
+VALUES
+0   End
+1 Unresolved
+2 _NOT_Found
+3 x_solve_..omp_fn.0 [x_solve_._omp_fn.0]
+4 y_solve_..omp_fn.0 [y_solve_._omp_fn.0]
+5 z_solve_..omp_fn.0 [z_solve_._omp_fn.0]
+6 add_._omp_fn.0
+7 compute_..omp_fn.0 [compute_rhs_._omp_fn.0]
+8 copy_x_f..omp_fn.1 [copy_x_face_._omp_fn.1]
+9 copy_y_f..omp_fn.1 [copy_y_face_._omp_fn.1]
+10 copy_x_f..omp_fn.0 [copy_x_face_._omp_fn.0]
+11 copy_y_f..omp_fn.0 [copy_y_face_._omp_fn.0]
+12 MAIN__
+13 error_no..omp_fn.0 [error_norm_._omp_fn.0]
+14 rhs_norm..omp_fn.0 [rhs_norm_._omp_fn.0]
+
+
+EVENT_TYPE
+0    60000123    Executed OpenMP task function line and file
+VALUES
+0   End
+1 0 (Unresolved)
+2 0 (_NOT_Found)
+3 0 (add.f, bt-mz.A.x)
+4 0 (bt.f, bt-mz.A.x)
+5 0 (bt.f, bt-mz.A.x)
+6 0 (bt.f, bt-mz.A.x)
+7 0 (bt.f, bt-mz.A.x)
+8 0 (error.f, bt-mz.A.x)
+9 0 (error.f, bt-mz.A.x)
+10 0 (exch_qbc.f, bt-mz.A.x)
+11 0 (exch_qbc.f, bt-mz.A.x)
+12 0 (exch_qbc.f, bt-mz.A.x)
+13 0 (exch_qbc.f, bt-mz.A.x)
+14 0 (rhs.f, bt-mz.A.x)
+15 0 (x_solve.f, bt-mz.A.x)
+16 0 (y_solve.f, bt-mz.A.x)
+17 0 (z_solve.f, bt-mz.A.x)
+
+
+EVENT_TYPE
+0    60000024    Instantiated OpenMP task function
+VALUES
+0   End
+1 Unresolved
+2 _NOT_Found
+3 x_solve_..omp_fn.0 [x_solve_._omp_fn.0]
+4 y_solve_..omp_fn.0 [y_solve_._omp_fn.0]
+5 z_solve_..omp_fn.0 [z_solve_._omp_fn.0]
+6 add_._omp_fn.0
+7 compute_..omp_fn.0 [compute_rhs_._omp_fn.0]
+8 copy_x_f..omp_fn.1 [copy_x_face_._omp_fn.1]
+9 copy_y_f..omp_fn.1 [copy_y_face_._omp_fn.1]
+10 copy_x_f..omp_fn.0 [copy_x_face_._omp_fn.0]
+11 copy_y_f..omp_fn.0 [copy_y_face_._omp_fn.0]
+12 MAIN__
+13 error_no..omp_fn.0 [error_norm_._omp_fn.0]
+14 rhs_norm..omp_fn.0 [rhs_norm_._omp_fn.0]
+
+
+EVENT_TYPE
+0    60000124    Instantiated OpenMP task function line and file
+VALUES
+0   End
+1 0 (Unresolved)
+2 0 (_NOT_Found)
+3 0 (add.f, bt-mz.A.x)
+4 0 (bt.f, bt-mz.A.x)
+5 0 (bt.f, bt-mz.A.x)
+6 0 (bt.f, bt-mz.A.x)
+7 0 (bt.f, bt-mz.A.x)
+8 0 (error.f, bt-mz.A.x)
+9 0 (error.f, bt-mz.A.x)
+10 0 (exch_qbc.f, bt-mz.A.x)
+11 0 (exch_qbc.f, bt-mz.A.x)
+12 0 (exch_qbc.f, bt-mz.A.x)
+13 0 (exch_qbc.f, bt-mz.A.x)
+14 0 (rhs.f, bt-mz.A.x)
+15 0 (x_solve.f, bt-mz.A.x)
+16 0 (y_solve.f, bt-mz.A.x)
+17 0 (z_solve.f, bt-mz.A.x)
+
+
+EVENT_TYPE
+0 60000005 OpenMP barrier
+VALUES
+0 End
+1 Begin
+EVENT_TYPE
+0 65000000 Number of OpenMP instantiated tasks
+0 65000001 Number of OpenMP executed tasks
+
+EVENT_TYPE
+0    60000020    pthread function
+VALUES
+0   End
+1 Unresolved
+2 _NOT_Found
+3 x_solve_..omp_fn.0 [x_solve_._omp_fn.0]
+4 y_solve_..omp_fn.0 [y_solve_._omp_fn.0]
+5 z_solve_..omp_fn.0 [z_solve_._omp_fn.0]
+6 add_._omp_fn.0
+7 compute_..omp_fn.0 [compute_rhs_._omp_fn.0]
+8 copy_x_f..omp_fn.1 [copy_x_face_._omp_fn.1]
+9 copy_y_f..omp_fn.1 [copy_y_face_._omp_fn.1]
+10 copy_x_f..omp_fn.0 [copy_x_face_._omp_fn.0]
+11 copy_y_f..omp_fn.0 [copy_y_face_._omp_fn.0]
+12 MAIN__
+13 error_no..omp_fn.0 [error_norm_._omp_fn.0]
+14 rhs_norm..omp_fn.0 [rhs_norm_._omp_fn.0]
+
+
+EVENT_TYPE
+0    60000120    pthread function line and file
+VALUES
+0   End
+1 0 (Unresolved)
+2 0 (_NOT_Found)
+3 0 (add.f, bt-mz.A.x)
+4 0 (bt.f, bt-mz.A.x)
+5 0 (bt.f, bt-mz.A.x)
+6 0 (bt.f, bt-mz.A.x)
+7 0 (bt.f, bt-mz.A.x)
+8 0 (error.f, bt-mz.A.x)
+9 0 (error.f, bt-mz.A.x)
+10 0 (exch_qbc.f, bt-mz.A.x)
+11 0 (exch_qbc.f, bt-mz.A.x)
+12 0 (exch_qbc.f, bt-mz.A.x)
+13 0 (exch_qbc.f, bt-mz.A.x)
+14 0 (rhs.f, bt-mz.A.x)
+15 0 (x_solve.f, bt-mz.A.x)
+16 0 (y_solve.f, bt-mz.A.x)
+17 0 (z_solve.f, bt-mz.A.x)
+
+
+EVENT_TYPE
+6    40000033    Executing CPU
+6    40000133    CPU-Event sampling interval
+
+
+EVENT_TYPE
+6    40000001    Application
+VALUES
+0      End
+1      Begin
+
+
+EVENT_TYPE
+6    40000050    RAW clock() value from system
+
+
+EVENT_TYPE
+6    40000003    Flushing Traces
+VALUES
+0      End
+1      Begin
+
+
+EVENT_TYPE
+6    40000036    Process IDentifier
+6    40000037    Parent Process IDentifier
+6    40000038    fork() depth
+
+
+EVENT_TYPE
+7  42000050 PAPI_TOT_INS [Instr completed]
+7  42000059 PAPI_TOT_CYC [Total cycles]
+7  42000006 PAPI_L1_TCM [L1 cache misses]
+7  42000007 PAPI_L2_TCM [L2 cache misses]
+7  41999999 Active hardware counter set
+
+
+GRADIENT_COLOR
+0    {0,255,2}
+1    {0,244,13}
+2    {0,232,25}
+3    {0,220,37}
+4    {0,209,48}
+5    {0,197,60}
+6    {0,185,72}
+7    {0,173,84}
+8    {0,162,95}
+9    {0,150,107}
+10    {0,138,119}
+11    {0,127,130}
+12    {0,115,142}
+13    {0,103,154}
+14    {0,91,166}
+
+
+GRADIENT_NAMES
+0    Gradient 0
+1    Grad. 1/MPI Events
+2    Grad. 2/OMP Events
+3    Grad. 3/OMP locks
+4    Grad. 4/User func
+5    Grad. 5/User Events
+6    Grad. 6/General Events
+7    Grad. 7/Hardware Counters
+8    Gradient 8
+9    Gradient 9
+10    Gradient 10
+11    Gradient 11
+12    Gradient 12
+13    Gradient 13
+14    Gradient 14
+
+
+EVENT_TYPE
+0    70000001    Caller at level 1
+0    70000002    Caller at level 2
+0    70000003    Caller at level 3
+VALUES
+0   End
+1 Unresolved
+2 _NOT_Found
+3 x_solve_..omp_fn.0 [x_solve_._omp_fn.0]
+4 y_solve_..omp_fn.0 [y_solve_._omp_fn.0]
+5 z_solve_..omp_fn.0 [z_solve_._omp_fn.0]
+6 add_._omp_fn.0
+7 compute_..omp_fn.0 [compute_rhs_._omp_fn.0]
+8 copy_x_f..omp_fn.1 [copy_x_face_._omp_fn.1]
+9 copy_y_f..omp_fn.1 [copy_y_face_._omp_fn.1]
+10 copy_x_f..omp_fn.0 [copy_x_face_._omp_fn.0]
+11 copy_y_f..omp_fn.0 [copy_y_face_._omp_fn.0]
+12 MAIN__
+13 error_no..omp_fn.0 [error_norm_._omp_fn.0]
+14 rhs_norm..omp_fn.0 [rhs_norm_._omp_fn.0]
+
+
+EVENT_TYPE
+0    80000001    Caller line at level 1
+0    80000002    Caller line at level 2
+0    80000003    Caller line at level 3
+VALUES
+0   End
+1 0 (Unresolved)
+2 0 (_NOT_Found)
+3 0 (add.f, bt-mz.A.x)
+4 0 (bt.f, bt-mz.A.x)
+5 0 (bt.f, bt-mz.A.x)
+6 0 (bt.f, bt-mz.A.x)
+7 0 (bt.f, bt-mz.A.x)
+8 0 (error.f, bt-mz.A.x)
+9 0 (error.f, bt-mz.A.x)
+10 0 (exch_qbc.f, bt-mz.A.x)
+11 0 (exch_qbc.f, bt-mz.A.x)
+12 0 (exch_qbc.f, bt-mz.A.x)
+13 0 (exch_qbc.f, bt-mz.A.x)
+14 0 (rhs.f, bt-mz.A.x)
+15 0 (x_solve.f, bt-mz.A.x)
+16 0 (y_solve.f, bt-mz.A.x)
+17 0 (z_solve.f, bt-mz.A.x)
+
+
+EVENT_TYPE
+0 41000000 Object addresses for task 1.1
+VALUES
+1 options.19.4233 [0x00421370-0x0042138b]
+2 completed.7392 [0x004251a0-0x004251a0]
+3 __FRAME_END__ [0x00423964-0x00423963]
+4 __GNU_EH_FRAME_HDR [0x00422728-0x00422727]
+5 __bt_fields_MOD_rhs [0x00425300-0x0042533f]
+6 __bt_data_MOD_dnym1 [0x00425ac0-0x00425ac7]
+7 __bt_data_MOD_dx1tx1 [0x00425a60-0x00425a67]
+8 __timers_MOD_elapsed [0x004266c0-0x004268bf]
+9 __bt_data_MOD_comz1 [0x00425b00-0x00425b07]
+10 __bt_data_MOD_dtdssp [0x00425aa0-0x00425aa7]
+11 __bt_data_MOD_iz_south [0x004258a0-0x004258df]
+12 __bt_data_MOD_xxcon4 [0x00425608-0x0042560f]
+13 __bt_data_MOD_dz5 [0x00425978-0x0042597f]
+14 __bt_data_MOD_dy4ty1 [0x004259d8-0x004259df]
+15 __bt_data_MOD_yycon5 [0x004255a8-0x004255af]
+16 __mpinpb_MOD_qstart2_east [0x00426260-0x0042629f]
+17 __mpinpb_MOD_qstart2_north [0x00426220-0x0042625f]
+18 __mpinpb_MOD_num_procs [0x00426488-0x0042648b]
+19 __bt_data_MOD_xxcon5 [0x00425600-0x00425607]
+20 __bt_data_MOD_dy2 [0x00425a00-0x00425a07]
+21 __bt_data_MOD_dz3tz1 [0x00425990-0x00425997]
+22 __mpinpb_MOD_proc_group [0x00426400-0x0042643f]
+23 __bt_data_MOD_dz2tz1 [0x004259a0-0x004259a7]
+24 __mpinpb_MOD_proc_num_zones [0x004263a0-0x004263a3]
+25 __bt_data_MOD_c5 [0x00425d30-0x00425d37]
+26 __bt_data_MOD_start5 [0x004256c0-0x004256ff]
+27 __bt_data_MOD_x_end [0x00425650-0x0042565f]
+28 __bt_data_MOD_dx3 [0x00425a48-0x00425a4f]
+29 __bt_fields_MOD_vs [0x00425200-0x0042523f]
+30 __bt_data_MOD_dtty2 [0x00425a80-0x00425a87]
+31 __bt_data_MOD_qstart_west [0x00425740-0x0042577f]
+32 __offload_funcs_end [0x00422728-0x00422727]
+33 mpi_fortran_errcodes_ignore_ [0x00426940-0x00426947]
+34 __mpinpb_MOD_statuses [0x00425e00-0x004260ff]
+35 _IO_stdin_used [0x00421000-0x00421003]
+36 mpi_fortran_statuses_ignore_ [0x004268c0-0x004268d7]
+37 __bt_data_MOD_qoffset [0x00425840-0x00425843]
+38 __bt_data_MOD_npb_verbose [0x00425844-0x00425847]
+39 __bt_data_MOD_dz5tz1 [0x00425970-0x00425977]
+40 __bt_data_MOD_dy3 [0x004259f0-0x004259f7]
+41 __bt_data_MOD_x_start [0x00425630-0x0042563f]
+42 __bt_data_MOD_c2 [0x00425d90-0x00425d97]
+43 __mpinpb_MOD_mz_bload_erank [0x0042648c-0x0042648f]
+44 __bt_data_MOD_ce [0x00425b20-0x00425d27]
+45 __bt_data_MOD_dx4 [0x00425a38-0x00425a3f]
+46 __bt_data_MOD_qstart_south [0x00425780-0x004257bf]
+47 __bt_data_MOD_dymax [0x004259c0-0x004259c7]
+48 __bt_data_MOD_dx2tx1 [0x00425a50-0x00425a57]
+49 mpi_fortran_unweighted_ [0x00426960-0x00426967]
+50 __dso_handle [0x00421008-0x00421007]
+51 __mpinpb_MOD_zone_proc_id [0x00425dc0-0x00425dff]
+52 __bt_data_MOD_conz1 [0x00425ad0-0x00425ad7]
+53 __offload_vars_end [0x00422728-0x00422727]
+54 __bt_fields_MOD_nxmax [0x004254c0-0x004254ff]
+55 __bt_data_MOD_c2iv [0x00425d70-0x00425d77]
+56 __bt_data_MOD_dzmax [0x00425968-0x0042596f]
+57 __mpinpb_MOD_qstart2_west [0x004261a0-0x004261df]
+58 __mpinpb_MOD_max_threads [0x00426498-0x0042649b]
+59 __bt_data_MOD_ty1 [0x00425688-0x0042568f]
+60 __bt_data_MOD_c5dssp [0x00425d28-0x00425d2f]
+61 __bt_data_MOD_dx5tx1 [0x00425a20-0x00425a27]
+62 __mpinpb_MOD_active [0x004264a8-0x004264ab]
+63 __bt_fields_MOD_rho_i [0x00425340-0x0042537f]
+64 __bt_data_MOD_dy4 [0x004259e0-0x004259e7]
+65 mpi_fortran_status_ignore_ [0x004268e0-0x004268f7]
+66 __bt_data_MOD_qstart_east [0x00425800-0x0042583f]
+67 __bt_data_MOD_c1c2 [0x00425da0-0x00425da7]
+68 __bt_data_MOD_c3 [0x00425d68-0x00425d6f]
+69 __offload_func_table [0x00422728-0x00422727]
+70 __bt_data_MOD_dz1tz1 [0x004259b0-0x004259b7]
+71 __bt_data_MOD_dx5 [0x00425a28-0x00425a2f]
+72 __bt_fields_MOD_square [0x004252c0-0x004252ff]
+73 __bt_data_MOD_dy2ty1 [0x004259f8-0x004259ff]
+74 mpi_fortran_bottom_ [0x00426900-0x00426903]
+75 __bt_data_MOD_zzcon1 [0x004255a0-0x004255a7]
+76 __bt_data_MOD_q [0x00001280-0x00001457]
+77 __bt_data_MOD_dttx1 [0x00425a98-0x00425a9f]
+78 __bt_data_MOD_tot_zonesize5 [0x004256a8-0x004256ab]
+79 __bt_data_MOD_dssp [0x00425ab0-0x00425ab7]
+80 __bt_data_MOD_iz_east [0x00425920-0x0042595f]
+81 __mpinpb_MOD_myid [0x00426494-0x00426497]
+82 __mpinpb_MOD_qcomm_size [0x004262a0-0x004262df]
+83 __bt_data_MOD_ty2 [0x00425680-0x00425687]
+84 __bt_fields_MOD_qbc_ou [0x004253c0-0x004253ff]
+85 __mpinpb_MOD_requests [0x00426120-0x0042619f]
+86 __bt_data_MOD_c3c4tz3 [0x00425d48-0x00425d4f]
+87 __bt_data_MOD_dy5 [0x004259d0-0x004259d7]
+88 __bt_fields_MOD_us [0x00425240-0x0042527f]
+89 __bt_fields_MOD_nx [0x00425500-0x0042553f]
+90 __bt_data_MOD_c3c4 [0x00425d60-0x00425d67]
+91 __bt_data_MOD_rtmp [0x00000940-0x00001277]
+92 __bt_data_MOD_tx1 [0x004256a0-0x004256a7]
+93 __bt_data_MOD_c2dttz1 [0x00425d78-0x00425d7f]
+94 __bt_data_MOD_dnzm1 [0x00425ab8-0x00425abf]
+95 __bt_data_MOD_con43 [0x00425ad8-0x00425adf]
+96 __bt_data_MOD_iz_north [0x004258e0-0x0042591f]
+97 __bt_data_MOD_zzcon2 [0x00425598-0x0042559f]
+98 __bt_data_MOD_y_start [0x004255d0-0x004255df]
+99 __mpinpb_MOD_num_threads [0x00426480-0x00426483]
+100 __bt_data_MOD_dttx2 [0x00425a90-0x00425a97]
+101 __bt_data_MOD_comz5 [0x00425af0-0x00425af7]
+102 __bt_data_MOD_dz1 [0x004259b8-0x004259bf]
+103 __bt_data_MOD_yycon1 [0x004255c8-0x004255cf]
+104 __bt_data_MOD_ty3 [0x00425678-0x0042567f]
+105 __mpinpb_MOD_proc_zone_id [0x00426320-0x0042635f]
+106 __bt_data_MOD_c2dtty1 [0x00425d80-0x00425d87]
+107 __bt_data_MOD_y_end [0x004255f0-0x004255ff]
+108 __bt_data_MOD_lhs [0x00004280-0x0000ccc7]
+109 __bt_data_MOD_tx2 [0x00425698-0x0042569f]
+110 mpi_fortran_argv_null_ [0x00426980-0x00426987]
+111 __bt_data_MOD_start1 [0x00425700-0x0042573f]
+112 __bt_data_MOD_c1 [0x00425db0-0x00425db7]
+113 mpi_fortran_weights_empty_ [0x004269a0-0x004269a7]
+114 __mpinpb_MOD_pcomm_group [0x00426440-0x0042647f]
+115 __bt_data_MOD_dy5ty1 [0x004259c8-0x004259cf]
+116 __bt_data_MOD_x_size [0x00425640-0x0042564f]
+117 __bt_data_MOD_njac [0x00001460-0x00004277]
+118 __mpinpb_MOD_comm_setup [0x004264a4-0x004264a7]
+119 __bt_data_MOD_iz_west [0x00425860-0x0042589f]
+120 __bt_data_MOD_tot_bcsize_in [0x004256b4-0x004256b7]
+121 __bt_fields_MOD_ny [0x00425480-0x004254bf]
+122 __bt_data_MOD_zzcon3 [0x00425590-0x00425597]
+123 __bt_data_MOD_c3c4tx3 [0x00425d58-0x00425d5f]
+124 __bt_data_MOD_c4dssp [0x00425d38-0x00425d3f]
+125 __bt_fields_MOD_ws [0x004251c0-0x004251ff]
+126 __bt_data_MOD_dy1ty1 [0x00425a08-0x00425a0f]
+127 __bt_fields_MOD_forcing [0x00425540-0x0042557f]
+128 __bt_data_MOD_comz4 [0x00425af8-0x00425aff]
+129 __bt_data_MOD_xxcon1 [0x00425620-0x00425627]
+130 __bt_data_MOD_c2dttx1 [0x00425d88-0x00425d8f]
+131 __bt_data_MOD_tot_zonesize [0x004256ac-0x004256af]
+132 __bt_data_MOD_dz2 [0x004259a8-0x004259af]
+133 __bt_data_MOD_yycon2 [0x004255c0-0x004255c7]
+134 __mpinpb_MOD_mz_bload [0x00426490-0x00426493]
+135 _end [0x004269c8-0x004269c7]
+136 __mpinpb_MOD_proc_num_threads [0x004263c0-0x004263ff]
+137 __bt_data_MOD_timeron [0x004256b8-0x004256bb]
+138 __mpinpb_MOD_num_procs2 [0x00426484-0x00426487]
+139 __offload_var_table [0x00422728-0x00422727]
+140 __bt_data_MOD_dttz1 [0x00425a78-0x00425a7f]
+141 __bt_data_MOD_tz1 [0x00425670-0x00425677]
+142 __bt_data_MOD_cuf [0x0000faf0-0x0000fcc7]
+143 __bt_fields_MOD_qbc_in [0x00425400-0x0042543f]
+144 __mpinpb_MOD_ierror [0x0042649c-0x0042649f]
+145 __bt_data_MOD_c1345 [0x00425da8-0x00425daf]
+146 __mpinpb_MOD_qstart2_south [0x004261e0-0x0042621f]
+147 __bt_fields_MOD_nz [0x00425440-0x0042547f]
+148 __bt_data_MOD_zzcon4 [0x00425588-0x0042558f]
+149 __bss_start [0x00425194-0x00425193]
+150 __bt_data_MOD_qstart_north [0x004257c0-0x004257ff]
+151 __bt_data_MOD_tx3 [0x00425690-0x00425697]
+152 __bt_data_MOD_tz2 [0x00425668-0x0042566f]
+153 __bt_data_MOD_c3c4ty3 [0x00425d50-0x00425d57]
+154 __bt_data_MOD_xxcon2 [0x00425618-0x0042561f]
+155 __bt_data_MOD_dz3 [0x00425998-0x0042599f]
+156 __bt_fields_MOD_qs [0x00425380-0x004253bf]
+157 __bt_data_MOD_yycon3 [0x004255b8-0x004255bf]
+158 __bt_data_MOD_dx4tx1 [0x00425a30-0x00425a37]
+159 __mpinpb_MOD_dp_type [0x004264a0-0x004264a3]
+160 __mpinpb_MOD_proc_zone_size [0x004262e0-0x0042631f]
+161 __bt_data_MOD_dy3ty1 [0x004259e8-0x004259ef]
+162 __bt_fields_MOD_u [0x00425280-0x004252bf]
+163 __bt_data_MOD_dttz2 [0x00425a70-0x00425a77]
+164 __bt_data_MOD_dx1 [0x00425a68-0x00425a6f]
+165 mpi_fortran_argvs_null_ [0x004269c0-0x004269c7]
+166 __bt_data_MOD_dxmax [0x00425a18-0x00425a1f]
+167 __bt_data_MOD_zzcon5 [0x00425580-0x00425587]
+168 __bt_data_MOD_dz4tz1 [0x00425980-0x00425987]
+169 __bt_data_MOD_con16 [0x00425ae0-0x00425ae7]
+170 __bt_data_MOD_fjac [0x0000ccd0-0x0000fae7]
+171 __bt_data_MOD_tz3 [0x00425660-0x00425667]
+172 __bt_data_MOD_comz6 [0x00425ae8-0x00425aef]
+173 __timers_MOD_start [0x004264c0-0x004266bf]
+174 mpi_fortran_in_place_ [0x00426920-0x00426923]
+175 __bt_data_MOD_y_size [0x004255e0-0x004255ef]
+176 __bt_data_MOD_xxcon3 [0x00425610-0x00425617]
+177 __bt_data_MOD_dz4 [0x00425988-0x0042598f]
+178 __bt_data_MOD_yycon4 [0x004255b0-0x004255b7]
+179 __mpinpb_MOD_proc_zone_count [0x00426360-0x0042639f]
+180 __mpinpb_MOD_root [0x00426100-0x00426103]
+181 __bt_data_MOD_elapsed_time [0x00425960-0x00425967]
+182 __bt_data_MOD_tot_bcsize_ou [0x004256b0-0x004256b3]
+183 __bt_data_MOD_dy1 [0x00425a10-0x00425a17]
+184 __bt_data_MOD_dt [0x00425aa8-0x00425aaf]
+185 __bt_data_MOD_ue [0x00000000-0x00000937]
+186 __bt_data_MOD_dnxm1 [0x00425ac8-0x00425acf]
+187 __bt_data_MOD_c1c5 [0x00425d98-0x00425d9f]
+188 __bt_data_MOD_c4 [0x00425d40-0x00425d47]
+189 __bt_data_MOD_dx2 [0x00425a58-0x00425a5f]
+190 __bt_data_MOD_dtty1 [0x00425a88-0x00425a8f]
+191 __bt_data_MOD_dx3tx1 [0x00425a40-0x00425a47]
+192 __bt_data_MOD_buf [0x0000fcd0-0x00010607]
+
+EVENT_TYPE
+0    45000000    User time used
+0    45000001    System time used
+0    45000006    Soft page faults
+0    45000007    Hard page faults
+0    45000014    Voluntary context switches
+0    45000015    Involuntary context switches
+
+
+EVENT_TYPE
+9    40000018    Tracing mode:
+VALUES
+1      Detailed
+2      CPU Bursts
+
+
