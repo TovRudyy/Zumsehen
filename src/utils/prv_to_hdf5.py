@@ -99,7 +99,7 @@ def parse_lines_as_list(lines):
             lcomm.append(record)
         else:
             pass
-    return [lstate, levent, lcomm]
+    return np.array([lstate, levent, lcomm])
 
 
 def parse_lines_to_nparray(lines):
@@ -107,11 +107,9 @@ def parse_lines_to_nparray(lines):
     parsed_lines = None
     for block_lines in isplit(lines, BLOCK_LINE):
         if parsed_lines is None:
-            parsed_lines = [np.array(array) for array in parse_lines_as_list(block_lines)]
+            parsed_lines = parse_lines_as_list(block_lines)
         else:
-            parsed_lines = [
-                np.concatenate([parsed_lines[i], array]) for i, array in enumerate(parse_lines_as_list(block_lines))
-            ]
+            parsed_lines = np.concatenate([parsed_lines, parse_lines_as_list(block_lines)])
     return parsed_lines
 
 
