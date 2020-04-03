@@ -135,11 +135,14 @@ def seq_parse_as_dataframe(file):
         else:
             parsed_file = np.concatenate([parsed_file, parse_lines_to_nparray(chunk)])
 
-    df_state = None if parsed_file[0].size == 0 else parsed_file[0]
+    logger.warning(len(parsed_file[0]))
+    logger.warning(len(parsed_file[1]))
+    logger.warning(len(parsed_file[2]))
+    df_state = None if len(parsed_file[0]) == 0 else parsed_file[0]
     df_state = pd.DataFrame(data=df_state, columns=COL_STATE_RECORD)[COL_STATE_RECORD]
-    df_event = None if parsed_file[1].size == 0 else parsed_file[1]
+    df_event = None if len(parsed_file[1]) == 0 else parsed_file[1]
     df_event = pd.DataFrame(data=df_event, columns=COL_EVENT_RECORD)[COL_EVENT_RECORD]
-    df_comm = None if parsed_file[2].size == 0 else parsed_file[2]
+    df_comm = None if len(parsed_file[2]) == 0 else parsed_file[2]
     df_comm = pd.DataFrame(data=df_comm, columns=COL_COMM_RECORD)[COL_COMM_RECORD]
 
     print(f"Total time: {time.time() - start_time}")
@@ -153,9 +156,15 @@ def parallel_parse_as_dataframe(file):
 
     parsed_file = reduce(np.concatenate, parsed_file)
 
-    df_state = parsed_file[0]
-    df_event = parsed_file[1]
-    df_comm = parsed_file[2]
+    logger.warning(len(parsed_file[0]))
+    logger.warning(len(parsed_file[1]))
+    logger.warning(len(parsed_file[2]))
+    df_state = None if len(parsed_file[0]) == 0 else parsed_file[0]
+    df_state = pd.DataFrame(data=df_state, columns=COL_STATE_RECORD)[COL_STATE_RECORD]
+    df_event = None if len(parsed_file[1]) == 0 else parsed_file[1]
+    df_event = pd.DataFrame(data=df_event, columns=COL_EVENT_RECORD)[COL_EVENT_RECORD]
+    df_comm = None if len(parsed_file[2]) == 0 else parsed_file[2]
+    df_comm = pd.DataFrame(data=df_comm, columns=COL_COMM_RECORD)[COL_COMM_RECORD]
 
     print(f"Total time: {time.time() - start_time}")
     return df_state, df_event, df_comm

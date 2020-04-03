@@ -5,7 +5,7 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from src.utils.prv_to_hdf5 import seq_parse_as_dataframe
+from src.utils.prv_to_hdf5 import seq_parse_as_dataframe, parallel_parse_as_dataframe
 
 test_suite = [f"test/test_files/traces/{test}" for test in ["1MB.test.prv", "10MB.test.prv", "bt-mz.2x2.test.prv"]]
 
@@ -31,6 +31,18 @@ def test_seq_prv_trace_parser():
     data = get_prv_test_traces()
     for test in data:
         df_state, df_event, df_comm = seq_parse_as_dataframe(test["Input"])
+        df_state = df_state.astype("int64")
+        df_event = df_event.astype("int64")
+        df_comm = df_comm.astype("int64")
+        assert test["states_records"].equals(df_state)
+        assert test["event_records"].equals(df_event)
+        assert test["comm_records"].equals(df_comm)
+
+
+def test_parallel_prv_trace_parser():
+    data = get_prv_test_traces()
+    for test in data:
+        df_state, df_event, df_comm = parallel_parse_as_dataframe(test["Input"])
         df_state = df_state.astype("int64")
         df_event = df_event.astype("int64")
         df_comm = df_comm.astype("int64")
