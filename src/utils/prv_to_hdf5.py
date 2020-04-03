@@ -104,12 +104,7 @@ def parse_lines_as_list(lines):
 
 def parse_lines_to_nparray(lines):
     """ Parse 'lines' lines to numpy.array(s) in batches of 'block' lines"""
-    parsed_lines = None
-    for block_lines in isplit(lines, BLOCK_LINE):
-        if parsed_lines is None:
-            parsed_lines = parse_lines_as_list(block_lines)
-        else:
-            parsed_lines = np.concatenate([parsed_lines, parse_lines_as_list(block_lines)])
+    parsed_lines = np.concatenate([parse_lines_as_list(block_lines) for block_lines in isplit(lines, BLOCK_LINE)])
     return parsed_lines
 
 
@@ -125,13 +120,8 @@ def chunk_reader(filename, read_bytes):
 
 
 def seq_parse_as_dataframe(file):
-    parsed_file = None
     start_time = time.time()
-    for chunk in chunk_reader(file, MAX_READ_BYTES):
-        if parsed_file is None:
-            parsed_file = parse_lines_to_nparray(chunk)
-        else:
-            parsed_file = np.concatenate([parsed_file, parse_lines_to_nparray(chunk)])
+    parsed_file = np.concatenate([parse_lines_to_nparray(chunk) for chunk in chunk_reader(file, MAX_READ_BYTES)])
 
     logger.warning(len(parsed_file[0]))
     logger.warning(len(parsed_file[1]))
@@ -151,8 +141,7 @@ def parallel_parse_as_dataframe(file):
     start_time = time.time()
     with ProcessPoolExecutor() as executor:
         parsed_file = executor.map(parse_lines_to_nparray, chunk_reader(file, MAX_READ_BYTES_PARALLEL))
-
-    parsed_file = reduce(np.concatenate, parsed_file)
+    parsed_file = np.concatenate(list(parsed_file))
 
     logger.warning(len(parsed_file[0]))
     logger.warning(len(parsed_file[1]))
