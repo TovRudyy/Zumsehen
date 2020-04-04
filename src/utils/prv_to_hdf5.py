@@ -136,7 +136,7 @@ def parse_records(chunk, arr_state, stcount, arr_event, evcount, arr_comm, commc
 MIN_ELEM = 40000000
 
 def seq_parse_as_dataframe(file):
-    ## This algorithm is a loop dividin in chunks of MAX_READ_BYTES
+    ## This algorithm is a loop divided in chunks of MAX_READ_BYTES
     start_time = time.time()
     # Pre-allocation of arrays. *count variables count how many elements we actually have
     stcount, arr_state = 0, np.zeros(MIN_ELEM, dtype="int64")
