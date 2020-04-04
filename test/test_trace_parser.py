@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from src.utils.prv_to_hdf5 import parallel_parse_as_dataframe, seq_parse_as_dataframe
+from src.utils.prv_to_hdf5 import parse_as_dataframe
 
 test_suite = [f"test/test_files/traces/{test}" for test in ["bt-mz.2x2.test.prv"]]
 
@@ -30,7 +30,7 @@ def get_prv_test_traces():
 all_parser_params = (
     {"STEPS": 200000, "MAX_READ_BYTES": 1024 * 1024 * 1024 * 2, "MIN_ELEM": 40000000},
     {"STEPS": 1000, "MAX_READ_BYTES": 1024 * 1024 * 1024, "MIN_ELEM": 2000},
-    {"STEPS": 200000, "MAX_READ_BYTES": 1024, "MIN_ELEM": 40000000},
+    {"STEPS": 200000, "MAX_READ_BYTES": 1024 * 1024, "MIN_ELEM": 40000000},
 )
 
 
@@ -42,7 +42,7 @@ def test_seq_prv_trace_parser(parser_params):
 
         data = get_prv_test_traces()
         for test in data:
-            df_state, df_event, df_comm = seq_parse_as_dataframe(test["Input"])
+            df_state, df_event, df_comm = parse_as_dataframe(test["Input"])
             df_state = df_state.astype("int64")
             df_event = df_event.astype("int64")
             df_comm = df_comm.astype("int64")
