@@ -1,5 +1,6 @@
 import itertools
 import logging
+import os
 import time
 
 import numpy as np
@@ -52,7 +53,13 @@ COL_COMM_RECORD = [
 
 MB = 1024 * 1024
 GB = 1024 * 1024 * 1024
-MAX_READ_BYTES = GB * 2
+MAX_READ_BYTES = int(os.environ.get("STEPS", GB * 2))
+
+# For pre-allocating memory
+MIN_ELEM = int(os.environ.get("STEPS", 40000000))
+
+STEPS = int(os.environ.get("STEPS", 150000))
+RESIZE = 1
 
 
 def get_state_row(line):
@@ -97,10 +104,6 @@ def chunk_reader(filename, read_bytes):
             yield chunk
 
 
-STEPS = 150000
-RESIZE = 1
-
-
 def parse_records(chunk, arr_state, stcount, arr_event, evcount, arr_comm, commcount):
     # This is the padding between different records respectively
     stpadding, commpadding, evpadding = len(COL_STATE_RECORD), len(COL_COMM_RECORD), len(COL_EVENT_RECORD) * 10
@@ -132,11 +135,10 @@ def parse_records(chunk, arr_state, stcount, arr_event, evcount, arr_comm, commc
 
     return arr_state, stcount, arr_event, evcount, arr_comm, commcount
 
-# For pre-allocating memory
-MIN_ELEM = 40000000
 
 def seq_parse_as_dataframe(file):
-    ## This algorithm is a loop divided in chunks of MAX_READ_BYTES
+    logger.debug(f"Using parameters: STEPS {STEPS}, MAX_READ_BYTES {MAX_READ_BYTES}, MIN_ELEM {MIN_ELEM}")
+    # This algorithm is a loop divided in chunks of MAX_READ_BYTES
     start_time = time.time()
     # Pre-allocation of arrays. *count variables count how many elements we actually have
     stcount, arr_state = 0, np.zeros(MIN_ELEM, dtype="int64")
@@ -146,7 +148,7 @@ def seq_parse_as_dataframe(file):
         arr_state, stcount, arr_event, evcount, arr_comm, commcount = parse_records(
             chunk, arr_state, stcount, arr_event, evcount, arr_comm, commcount
         )
-        logger.info(f"TIMING (s) chunk_seq_parse:".ljust(30, " ") + "{:.3f}".format(time.time() - start_time))
+        # logger.info(f"TIMING (s) chunk_seq_parse:".ljust(30, " ") + "{:.3f}".format(time.time() - start_time))
 
     logger.info(
         f"ARRAY MAX SIZES (MB): {arr_state.nbytes//(1024*1024)} | { arr_event.nbytes//(1024*1024)} | {arr_comm.nbytes//(1024*1024)}"
@@ -168,19 +170,19 @@ def seq_parse_as_dataframe(file):
     return df_state, df_event, df_comm
 
 
-def parallel_parse_as_dataframe(file):
-    start_time = time.time()
-    with ProcessPoolExecutor() as executor:
-        parsed_file = executor.map(parse_lines_to_nparray, chunk_reader(file, MAX_READ_BYTES_PARALLEL))
-
-    parsed_file = reduce(np.concatenate, parsed_file)
-
-    df_state = parsed_file[0]
-    df_event = parsed_file[1]
-    df_comm = parsed_file[2]
-
-    print(f"Total time: {time.time() - start_time}")
-    return df_state, df_event, df_comm
+# def parallel_parse_as_dataframe(file):
+#     start_time = time.time()
+#     with ProcessPoolExecutor() as executor:
+#         parsed_file = executor.map(parse_lines_to_nparray, chunk_reader(file, MAX_READ_BYTES_PARALLEL))
+#
+#     parsed_file = reduce(np.concatenate, parsed_file)
+#
+#     df_state = parsed_file[0]
+#     df_event = parsed_file[1]
+#     df_comm = parsed_file[2]
+#
+#     print(f"Total time: {time.time() - start_time}")
+#     return df_state, df_event, df_comm
 
 
 TRACE = "/home/orudyy/Repositories/Zumsehen/test/test_files/traces/bt-mz.2x2.test.prv"
