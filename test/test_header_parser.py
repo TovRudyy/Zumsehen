@@ -1,14 +1,10 @@
 import json
-import logging
 import os
 from datetime import datetime
 
 import pytest
 
 from src.reader import prv_header_parser
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 
 def compare_trace_metadata(trace_a, trace_b):

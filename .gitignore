@@ -27,3 +27,6 @@ cache
 pip.conf
 build/
 test/test_files/headers/*.py
+
+# Extrae
+extrae/

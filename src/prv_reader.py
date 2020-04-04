@@ -210,7 +210,7 @@ def main(argv):
         print("-" * 78)
         print(tracedata["communication_records"])
 
-    write_to_hdf(argv[2], tracedata)
+    # write_to_hdf(argv[2], tracedata)
     return 0
 
 
