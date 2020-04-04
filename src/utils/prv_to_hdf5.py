@@ -58,7 +58,7 @@ MAX_READ_BYTES = int(os.environ.get("STEPS", GB * 2))
 # For pre-allocating memory
 MIN_ELEM = int(os.environ.get("STEPS", 40000000))
 
-STEPS = int(os.environ.get("STEPS", 150000))
+STEPS = int(os.environ.get("STEPS", 200000))
 RESIZE = 1
 
 
@@ -112,20 +112,37 @@ def parse_records(chunk, arr_state, stcount, arr_event, evcount, arr_comm, commc
         for record in records:
             record_type = record[0]
             if record_type == STATE_RECORD:
-                arr_state[stcount : stcount + stpadding] = get_state_row(record)
+                state = get_state_row(record)
+                try:
+                    arr_state[stcount : stcount + stpadding] = state
+                except:
+                    logger.warning("Catched exception: 'arr_state' need more space. Handling it...")
+                    arr_state = np.concatenate((arr_state, np.zeros(STEPS * stpadding * RESIZE)))
+                    arr_state[stcount : stcount + stpadding] = state
                 stcount += stpadding
             elif record_type == EVENT_RECORD:
                 # EVENT is a special type because we don't know how
                 # long will be the returned list
                 events = get_event_row(record)
-                arr_event[evcount : evcount + len(events)] = events
+                try:
+                    arr_event[evcount : evcount + len(events)] = events
+                except:
+                    logger.warning("Catched exception: 'arr_event' need more space. Handling it...")
+                    arr_event = np.concatenate((arr_event, np.zeros(STEPS * evpadding * RESIZE)))
+                    arr_event[evcount : evcount + len(events)] = events
                 evcount += len(events)
             elif record_type == COMM_RECORD:
-                arr_comm[commcount : commcount + commpadding] = get_comm_row(record)
+                comm = get_comm_row(record)
+                try:
+                    arr_comm[commcount : commcount + commpadding] = comm
+                except:
+                    logger.warning("Catched exception: 'arr_comm' need more space. Handling it...")
+                    arr_comm = np.concatenate((arr_comm, np.zeros(STEPS * commpadding * RESIZE)))
+                    arr_comm[commcount : commcount + commpadding] = comm
                 commcount += commpadding
 
-        # Check if the arrays have enough free space for the next iteration
-        # If not, resize the arrays according RESIZE
+        # Check if the arrays have enough free space for the next chunk iteration
+        # If not, resize the arrays heuristically
         if (arr_state.size - stcount) < STEPS * stpadding:
             arr_state = np.concatenate((arr_state, np.zeros(STEPS * stpadding * RESIZE)))
         if (arr_event.size - evcount) < STEPS * evpadding:
@@ -144,16 +161,17 @@ def seq_parse_as_dataframe(file):
     stcount, arr_state = 0, np.zeros(MIN_ELEM, dtype="int64")
     evcount, arr_event = 0, np.zeros(MIN_ELEM, dtype="int64")
     commcount, arr_comm = 0, np.zeros(MIN_ELEM, dtype="int64")
+    
     for chunk in chunk_reader(file, MAX_READ_BYTES):
         arr_state, stcount, arr_event, evcount, arr_comm, commcount = parse_records(
             chunk, arr_state, stcount, arr_event, evcount, arr_comm, commcount
         )
-        # logger.info(f"TIMING (s) chunk_seq_parse:".ljust(30, " ") + "{:.3f}".format(time.time() - start_time))
+        logger.debug(f"TIMING (s) chunk_seq_parse:".ljust(30, " ") + "{:.3f}".format(time.time() - start_time))
 
     logger.info(
         f"ARRAY MAX SIZES (MB): {arr_state.nbytes//(1024*1024)} | { arr_event.nbytes//(1024*1024)} | {arr_comm.nbytes//(1024*1024)}"
     )
-    # Remove the positions that have not been filled
+    # Remove the positions that have not been used
     arr_state, arr_event, arr_comm = arr_state[0:stcount], arr_event[0:evcount], arr_comm[0:commcount]
     # Reshape the arrays
     arr_state, arr_event, arr_comm = (
@@ -170,19 +188,19 @@ def seq_parse_as_dataframe(file):
     return df_state, df_event, df_comm
 
 
-# def parallel_parse_as_dataframe(file):
-#     start_time = time.time()
-#     with ProcessPoolExecutor() as executor:
-#         parsed_file = executor.map(parse_lines_to_nparray, chunk_reader(file, MAX_READ_BYTES_PARALLEL))
-#
-#     parsed_file = reduce(np.concatenate, parsed_file)
-#
-#     df_state = parsed_file[0]
-#     df_event = parsed_file[1]
-#     df_comm = parsed_file[2]
-#
-#     print(f"Total time: {time.time() - start_time}")
-#     return df_state, df_event, df_comm
+def parallel_parse_as_dataframe(file):
+    start_time = time.time()
+    with ProcessPoolExecutor() as executor:
+        parsed_file = executor.map(parse_lines_to_nparray, chunk_reader(file, MAX_READ_BYTES_PARALLEL))
+
+    parsed_file = reduce(np.concatenate, parsed_file)
+
+    df_state = parsed_file[0]
+    df_event = parsed_file[1]
+    df_comm = parsed_file[2]
+
+    print(f"Total time: {time.time() - start_time}")
+    return df_state, df_event, df_comm
 
 
 TRACE = "/home/orudyy/Repositories/Zumsehen/test/test_files/traces/bt-mz.2x2.test.prv"
@@ -193,7 +211,7 @@ TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps
 
 def test():
     # TraceMetaData = parse_file(TRACE)
-    df_state, df_event, df_comm = seq_parse_as_dataframe(TRACE)
+    df_state, df_event, df_comm = seq_parse_as_dataframe(TRACE_HUGE)
     # df_state, df_event, df_comm = seq_parse_as_dataframe("/home/orudyy/Downloads/200MB.prv")
     # df_state, df_event, df_comm = seq_parse_as_dataframe("/home/orudyy/Downloads/200MB.prv")
 
