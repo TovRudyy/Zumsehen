@@ -1,3 +1,4 @@
+import concurrent.futures
 import itertools
 import logging
 import os
@@ -5,6 +6,7 @@ import time
 
 import numpy as np
 import pandas as pd
+from numba import jit
 
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -64,7 +66,7 @@ RESIZE = 1
 
 def get_state_row(line):
     # We discard the record type field
-    return [int(x) for x in line.split(":")][1:]
+    return np.array([int(x) for x in line.split(":")])[1:]
 
 
 def get_comm_row(line):
@@ -104,7 +106,8 @@ def chunk_reader(filename, read_bytes):
             yield chunk
 
 
-def parse_records(chunk, arr_state, stcount, arr_event, evcount, arr_comm, commcount):
+def parse_records(chunk, arr_state, arr_event, arr_comm):
+    stcount, evcount, commcount = 0, 0, 0
     # This is the padding between different records respectively
     stpadding, commpadding, evpadding = len(COL_STATE_RECORD), len(COL_COMM_RECORD), len(COL_EVENT_RECORD) * 10
     # The loop is divided in chunks of STEPS size
@@ -153,26 +156,63 @@ def parse_records(chunk, arr_state, stcount, arr_event, evcount, arr_comm, commc
     return arr_state, stcount, arr_event, evcount, arr_comm, commcount
 
 
-def seq_parse_as_dataframe(file):
-    logger.debug(f"Using parameters: STEPS {STEPS}, MAX_READ_BYTES {MAX_READ_BYTES}, MIN_ELEM {MIN_ELEM}")
-    # This algorithm is a loop divided in chunks of MAX_READ_BYTES
+def seq_parser(chunks):
     start_time = time.time()
-    # Pre-allocation of arrays. *count variables count how many elements we actually have
-    stcount, arr_state = 0, np.zeros(MIN_ELEM, dtype="int64")
-    evcount, arr_event = 0, np.zeros(MIN_ELEM, dtype="int64")
-    commcount, arr_comm = 0, np.zeros(MIN_ELEM, dtype="int64")
+    # Pre-allocation of arrays
+    arr_state = np.zeros(MIN_ELEM, dtype="int64")
+    arr_event = np.zeros(MIN_ELEM, dtype="int64")
+    arr_comm = np.zeros(MIN_ELEM, dtype="int64")
     
-    for chunk in chunk_reader(file, MAX_READ_BYTES):
-        arr_state, stcount, arr_event, evcount, arr_comm, commcount = parse_records(
-            chunk, arr_state, stcount, arr_event, evcount, arr_comm, commcount
-        )
-        logger.debug(f"TIMING (s) chunk_seq_parse:".ljust(30, " ") + "{:.3f}".format(time.time() - start_time))
+    arr_state, stcount, arr_event, evcount, arr_comm, commcount = parse_records(
+        chunks, arr_state, arr_event, arr_comm
+    )
+    
+    # logger.debug(f"TIMING (s) chunk_seq_parse:".ljust(30, " ") + "{:.3f}".format(time.time() - start_time))
+    return arr_state, stcount, arr_event, evcount, arr_comm, commcount
 
+
+THREADS = 4
+
+
+def parallel_parse_as_dataframe(chunks, arr_state, stcount, arr_event, evcount, arr_comm, commcount):
+    for par_chunk in isplit(chunk, STEPS / THREADS):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=THREADS) as executor:
+            size_chunk = len(par_chunk)
+            for thread_id in range(1, THREADS + 1):
+                st_boundary_start, st_boundary_end = (
+                    stcount + size_chunk * thread_id,
+                    stcount + size_chunk * (thread_id + 1),
+                )
+                arr_state, arr_event, arr_comm = executor.map(seq_parser,)
+
+    return df_state, df_event, df_comm
+
+
+def parse_as_dataframe(file):
+    logger.debug(f"Using parameters: STEPS {STEPS}, MAX_READ_BYTES {MAX_READ_BYTES}, MIN_ELEM {MIN_ELEM}")
+    start_time = time.time()
+    # *count variables count how many elements we actually have
+    arr_state, stcount, arr_event, evcount, arr_comm, commcount = np.array([], dtype="int64"), 0, np.array([], dtype="int64"), 0, np.array([], dtype="int64"), 0
+    # This algorithm is a loop divided in chunks of MAX_READ_BYTES
+    for chunk in chunk_reader(file, MAX_READ_BYTES):
+        tmp_arr_state, tmp_stcount, tmp_arr_event, tmp_evcount, tmp_arr_comm, tmp_commcount = seq_parser(
+            chunk)
+        stcount, evcount, commcount = stcount+tmp_stcount, evcount+tmp_evcount, commcount+tmp_commcount
+        # Join the temporal arrays with the main
+        arr_state, arr_event, arr_comm = (
+            np.concatenate((arr_state, tmp_arr_state[0:tmp_stcount])),
+            np.concatenate((arr_event, tmp_arr_event[0:tmp_evcount])),
+            np.concatenate((arr_comm, tmp_arr_comm[0:tmp_commcount])),
+        )
+        
+        # Remove the positions that have not been used
+        # arr_state, arr_event, arr_comm = arr_state[0:stcount], arr_event[0:evcount], arr_comm[0:commcount]
+        
+    logger.info(f"TIMING (s) el_time_parser:".ljust(30, " ") + "{:.3f}".format(time.time() - start_time))
     logger.info(
         f"ARRAY MAX SIZES (MB): {arr_state.nbytes//(1024*1024)} | { arr_event.nbytes//(1024*1024)} | {arr_comm.nbytes//(1024*1024)}"
     )
-    # Remove the positions that have not been used
-    arr_state, arr_event, arr_comm = arr_state[0:stcount], arr_event[0:evcount], arr_comm[0:commcount]
+
     # Reshape the arrays
     arr_state, arr_event, arr_comm = (
         arr_state.reshape((stcount // len(COL_STATE_RECORD), len(COL_STATE_RECORD))),
@@ -183,12 +223,11 @@ def seq_parse_as_dataframe(file):
     df_state = pd.DataFrame(data=arr_state, columns=COL_STATE_RECORD)[COL_STATE_RECORD]
     df_event = pd.DataFrame(data=arr_event, columns=COL_EVENT_RECORD)[COL_EVENT_RECORD]
     df_comm = pd.DataFrame(data=arr_comm, columns=COL_COMM_RECORD)[COL_COMM_RECORD]
-    logger.info(f"TIMING (s) el_seq_parse:".ljust(30, " ") + "{:.3f}".format(time.time() - start_time))
 
     return df_state, df_event, df_comm
 
 
-def parallel_parse_as_dataframe(file):
+def megadri_parallel_parse_as_dataframe(file):
     start_time = time.time()
     with ProcessPoolExecutor() as executor:
         parsed_file = executor.map(parse_lines_to_nparray, chunk_reader(file, MAX_READ_BYTES_PARALLEL))
@@ -211,7 +250,7 @@ TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps
 
 def test():
     # TraceMetaData = parse_file(TRACE)
-    df_state, df_event, df_comm = seq_parse_as_dataframe(TRACE_HUGE)
+    df_state, df_event, df_comm = parse_as_dataframe(TRACE_HUGE)
     # df_state, df_event, df_comm = seq_parse_as_dataframe("/home/orudyy/Downloads/200MB.prv")
     # df_state, df_event, df_comm = seq_parse_as_dataframe("/home/orudyy/Downloads/200MB.prv")
 

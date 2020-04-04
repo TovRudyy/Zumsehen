@@ -30,7 +30,7 @@ def get_prv_test_traces():
 all_parser_params = (
     {"STEPS": 200000, "MAX_READ_BYTES": 1024 * 1024 * 1024 * 2, "MIN_ELEM": 40000000},
     {"STEPS": 1000, "MAX_READ_BYTES": 1024 * 1024 * 1024, "MIN_ELEM": 2000},
-    {"STEPS": 200000, "MAX_READ_BYTES": 1024 * 1024, "MIN_ELEM": 40000000},
+    {"STEPS": 200000, "MAX_READ_BYTES": 1024, "MIN_ELEM": 40000000},
 )
 
 
