@@ -153,7 +153,8 @@ def parse_records(chunk, arr_state, arr_event, arr_comm):
         if (arr_comm.size - commcount) < STEPS * commpadding:
             arr_comm = np.concatenate((arr_comm, np.zeros(STEPS * commpadding * RESIZE)))
 
-    return arr_state, stcount, arr_event, evcount, arr_comm, commcount
+    # Remove the positions that have not been used when returning
+    return arr_state[0:stcount], stcount, arr_event[0:evcount], evcount, arr_comm[0:commcount], commcount
 
 
 def seq_parser(chunks):
@@ -172,41 +173,47 @@ def seq_parser(chunks):
 THREADS = 4
 
 
-def parallel_parse_as_dataframe(chunks, arr_state, stcount, arr_event, evcount, arr_comm, commcount):
-    for par_chunk in isplit(chunk, STEPS / THREADS):
+def parallel_parse_as_dataframe(chunks):
+    # Pre-allocation of arrays
+    arr_state, stcount = np.zeros([], dtype="int64"), 0
+    arr_event, evcount = np.zeros([], dtype="int64"), 0
+    arr_comm, commcount = np.array([], dtype="int64"), 0
+    # Division of work for each thread
+    for par_chunk in isplit(chunk, STEPS // THREADS):
         with concurrent.futures.ProcessPoolExecutor(max_workers=THREADS) as executor:
             size_chunk = len(par_chunk)
-            for thread_id in range(1, THREADS + 1):
-                st_boundary_start, st_boundary_end = (
-                    stcount + size_chunk * thread_id,
-                    stcount + size_chunk * (thread_id + 1),
-                )
-                arr_state, arr_event, arr_comm = executor.map(seq_parser,)
-
-    return df_state, df_event, df_comm
+            arr_state, stcount, arr_event, evcount, arr_comm, commcount = [executor.submit(parse_records, )]
+            # Pre-allocation of temporal arrays for the threads
+            par_data = []
+            for thread_id in range(THREADS):
+                par_arr_state, par_stcount = np.array(MIN_ELEM//THREADS, dtype="int64"), 0
+                par_arr_event, par_evcount = np.array(MIN_ELEM//THREADS, dtype="int64"), 0
+                par_arr_comm, par_commcount = np.array(MIN_ELEM//THREADS, dtype="int64"), 0
+                par_data.append([par_arr_state, par_stcount, par_arr_event, par_evcount, par_arr_comm, par_commcount])
+            # Submission of parallel tasks
+            for thread_id in range(THREADS):
+                par_data[thread_id] = executor.submit(parse_records, par_chunk, par_data[thread_id][0], par_data[thread_id][2], par_data[thread_id][4])
+            for thread_id in range(THREADS):
+                # arr_state, stcount = np.concatenate(par_data[thread_id]
+                pass
+    return None
 
 
 def parse_as_dataframe(file):
     logger.debug(f"Using parameters: STEPS {STEPS}, MAX_READ_BYTES {MAX_READ_BYTES}, MIN_ELEM {MIN_ELEM}")
     start_time = time.time()
     # *count variables count how many elements we actually have
-    arr_state, stcount, arr_event, evcount, arr_comm, commcount = (
-        np.array([], dtype="int64"),
-        0,
-        np.array([], dtype="int64"),
-        0,
-        np.array([], dtype="int64"),
-        0,
-    )
+    arr_state, stcount, arr_event, evcount, arr_comm, commcount = np.array([], dtype="int64"), 0, np.array([], dtype="int64"), 0, np.array([], dtype="int64"), 0
     # This algorithm is a loop divided in chunks of MAX_READ_BYTES
     for chunk in chunk_reader(file, MAX_READ_BYTES):
-        tmp_arr_state, tmp_stcount, tmp_arr_event, tmp_evcount, tmp_arr_comm, tmp_commcount = seq_parser(chunk)
-        stcount, evcount, commcount = stcount + tmp_stcount, evcount + tmp_evcount, commcount + tmp_commcount
+        tmp_arr_state, tmp_stcount, tmp_arr_event, tmp_evcount, tmp_arr_comm, tmp_commcount = seq_parser(
+            chunk)
+        stcount, evcount, commcount = stcount+tmp_stcount, evcount+tmp_evcount, commcount+tmp_commcount
         # Join the temporal arrays with the main
         arr_state, arr_event, arr_comm = (
-            np.concatenate((arr_state, tmp_arr_state[0:tmp_stcount])),
-            np.concatenate((arr_event, tmp_arr_event[0:tmp_evcount])),
-            np.concatenate((arr_comm, tmp_arr_comm[0:tmp_commcount])),
+            np.concatenate((arr_state, tmp_arr_state)),
+            np.concatenate((arr_event, tmp_arr_event)),
+            np.concatenate((arr_comm, tmp_arr_comm)),
         )
 
         # Remove the positions that have not been used
