@@ -166,7 +166,6 @@ def seq_parser(chunks):
 
     arr_state, stcount, arr_event, evcount, arr_comm, commcount = parse_records(chunks, arr_state, arr_event, arr_comm)
 
-    # logger.debug(f"TIMING (s) chunk_seq_parse:".ljust(30, " ") + "{:.3f}".format(time.time() - start_time))
     return arr_state, stcount, arr_event, evcount, arr_comm, commcount
 
 
@@ -200,6 +199,9 @@ def parallel_parse_as_dataframe(chunks):
 
 
 def parse_as_dataframe(file):
+    ''' Memory complexity: O_max(N+(3N*)), O_nominal(N). O_max could be 4*N/CHUNK if the algorithm wrote to disk after each CHUNK
+        Computational complexity: O(N+c)
+    '''
     logger.debug(f"Using parameters: STEPS {STEPS}, MAX_READ_BYTES {MAX_READ_BYTES}, MIN_ELEM {MIN_ELEM}")
     start_time = time.time()
     # *count variables count how many elements we actually have
@@ -215,9 +217,6 @@ def parse_as_dataframe(file):
             np.concatenate((arr_event, tmp_arr_event)),
             np.concatenate((arr_comm, tmp_arr_comm)),
         )
-
-        # Remove the positions that have not been used
-        # arr_state, arr_event, arr_comm = arr_state[0:stcount], arr_event[0:evcount], arr_comm[0:commcount]
 
     logger.info(f"TIMING (s) el_time_parser:".ljust(30, " ") + "{:.3f}".format(time.time() - start_time))
     logger.info(
@@ -237,32 +236,19 @@ def parse_as_dataframe(file):
 
     return df_state, df_event, df_comm
 
-
-TRACE = "/home/orudyy/Repositories/Zumsehen/test/test_files/traces/bt-mz.2x2.test.prv"
-TRACE_HUGE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae10TimeSteps.01.chop1.prv"
-# TRACE = "/Users/adrianespejo/otros/Zusehen/traces/bt-mz.2x2-+A.x.prv"
-# TRACE = "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimpleExtrae40TimeSteps.prv"
-
-
-def test():
-    # TraceMetaData = parse_file(TRACE)
-    df_state, df_event, df_comm = parse_as_dataframe(TRACE_HUGE)
-    # df_state, df_event, df_comm = seq_parse_as_dataframe("/home/orudyy/Downloads/200MB.prv")
-    # df_state, df_event, df_comm = seq_parse_as_dataframe("/home/orudyy/Downloads/200MB.prv")
-
-    # pd.set_option("display.max_rows", None)
-    print(f"\nResulting State records data:\n {df_state.shape}")
-    print(f"\nResulting Event records data:\n {df_event.shape}")
-    print(f"\nResulting Comm. records data:\n {df_comm.shape}")
-
-    # input("Press any key to finish")
-    # logging.info(f"Header State records data\n {df_state[-20:]}")
-
-    # df_state2, df_event2, df_comm2 = load_as_dataframe(TRACE_HUGE)
-    # print(df_comm == df_comm2)
-    # print(df_state == df_state2)
-    # print(df_event == df_event2)
-
+def dataframe_to_hdf5(file, df_state, df_event, df_comm):
+    writer = pd.HDFStore(file, complevel=9, complib="zlib")
+    writer.put("States", df_state)
+    writer.put("Events", df_event)
+    writer.put("Comms", df_comm)
+    writer.close()
+    
+def dataframe_to_excel(file, df_state, df_event, df_comm):
+    writer = pd.ExcelWriter(file)
+    df_state.to_excel(writer, sheet_name="States")
+    df_event.to_excel(writer, sheet_name="Events")
+    df_comm.to_excel(writer, sheet_name="Comms")
+    writer.save()
 
 if __name__ == "__main__":
     test()
