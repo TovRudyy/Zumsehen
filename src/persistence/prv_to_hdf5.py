@@ -2,6 +2,7 @@ import itertools
 import logging
 import os
 import time
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -66,17 +67,17 @@ RESIZE = 1
 
 class ParaverToHDF5(FormatConverter):
     @staticmethod
-    def get_state_row(line):
-        # We discard the record type field
-        return np.array([int(x) for x in line.split(":")[1:]])
-
-    @staticmethod
-    def get_comm_row(line):
+    def get_state_row(line: str) -> List:
         # We discard the record type field
         return [int(x) for x in line.split(":")[1:]]
 
     @staticmethod
-    def get_event_row(line):
+    def get_comm_row(line: str) -> List:
+        # We discard the record type field
+        return [int(x) for x in line.split(":")[1:]]
+
+    @staticmethod
+    def get_event_row(line: str) -> List:
         # We discard the record type field
         record = [int(x) for x in line.split(":")[1:]]
         # The same Event record line can contain more than 1 Event
@@ -84,6 +85,9 @@ class ParaverToHDF5(FormatConverter):
         return list(itertools.chain.from_iterable([record[:5] + [event, next(event_iter)] for event in event_iter]))
 
     def parse_records(self, chunk, *args):
+        """
+        TODO: add documentation of this function
+        """
         arr_state, arr_event, arr_comm = args
         stcount, evcount, commcount = 0, 0, 0
         # This is the padding between different records respectively
@@ -134,7 +138,7 @@ class ParaverToHDF5(FormatConverter):
         # Remove the positions that have not been used when returning
         return arr_state[0:stcount], stcount, arr_event[0:evcount], evcount, arr_comm[0:commcount], commcount
 
-    def seq_parser(self, chunk):
+    def seq_parser(self, chunk: List[str]):
         start_time = time.time()
         # Pre-allocation of arrays
         arr_state = np.zeros(MIN_ELEM, dtype="int64")
@@ -147,7 +151,7 @@ class ParaverToHDF5(FormatConverter):
 
         return arr_state, stcount, arr_event, evcount, arr_comm, commcount
 
-    def parse_as_dataframe(self, file):
+    def parse_as_dataframe(self, file: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """ Memory complexity: O_max(N+(3N*)), O_nominal(N). O_max could be 4*N/CHUNK if the algorithm wrote to disk after each CHUNK
             Computational complexity: O(N+c)
         """

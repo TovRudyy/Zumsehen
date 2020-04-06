@@ -13,7 +13,7 @@ PARAVER_MAGIC_HEADER = "#Paraver"
 
 
 class ParaverReader(Reader):
-    def header_date(self, header):
+    def header_date(self, header: str):
         date, _, other = header.replace("#Paraver (", "").replace("at ", "").partition("):")
         date = datetime.strptime(date, "%d/%m/%Y %H:%M")
         return date
@@ -23,7 +23,7 @@ class ParaverReader(Reader):
         time = int(time)
         return time
 
-    def header_nodes(self, header):
+    def header_nodes(self, header: str):
         nodes = header[header.find("_ns:") + 4 :]
         if nodes[0] == "0":
             nodes = None
@@ -33,7 +33,7 @@ class ParaverReader(Reader):
             nodes = list(map(int, nodes))
         return nodes
 
-    def header_apps(self, header):
+    def header_apps(self, header: str):
         apps_list = []
         apps = header[header.find("_ns:") + 4 :]
         apps, _, other = apps.partition(":")
@@ -56,14 +56,14 @@ class ParaverReader(Reader):
             apps, _, other = other.partition(":")
         return apps_list
 
-    def header_parser(self, header):
+    def header_parser(self, header: str):
         header_time = self.header_time(header)
         header_date = self.header_date(header)
         header_nodes = self.header_nodes(header)
         header_apps = self.header_apps(header)
         return header_time, header_date, header_nodes, header_apps
 
-    def parse_file(self, file):
+    def parse_file(self, file: str):
         try:
             with open(file, "r") as f:
                 header = f.readline()

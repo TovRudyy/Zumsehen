@@ -15,7 +15,7 @@ def isplit(iterable, part_size, group=list):
         yield tmp
 
 
-def chunk_reader(filename, read_bytes):
+def chunk_reader(filename: str, read_bytes: int):
     with open(filename, "r") as f:
         # Discard the header
         f.readline()
@@ -32,7 +32,7 @@ class FormatConverter(ABC):
         pass
 
     @abstractmethod
-    def parse_as_dataframe(self, file):
+    def parse_as_dataframe(self, file: str):
         pass
 
     @abstractmethod
