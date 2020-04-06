@@ -30,3 +30,6 @@ test/test_files/headers/*.py
 
 # Extrae
 extrae/
+*.prv
+
+*.gz

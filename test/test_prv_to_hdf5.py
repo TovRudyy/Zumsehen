@@ -1,11 +1,10 @@
 import os
-from datetime import datetime
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
 
-from src.utils.prv_to_hdf5 import parse_as_dataframe
+from src.persistence.prv_to_hdf5 import ParaverToHDF5
 
 test_suite = [f"test/test_files/traces/{test}" for test in ["bt-mz.2x2.test.prv"]]
 
@@ -36,30 +35,14 @@ all_parser_params = (
 
 @pytest.mark.parametrize("parser_params", all_parser_params)
 def test_seq_prv_trace_parser(parser_params):
-    with patch("src.utils.prv_to_hdf5.STEPS", parser_params["STEPS"]), patch(
-        "src.utils.prv_to_hdf5.MAX_READ_BYTES", parser_params["MAX_READ_BYTES"]
-    ), patch("src.utils.prv_to_hdf5.MIN_ELEM", parser_params["MIN_ELEM"]):
+    with patch("src.persistence.prv_to_hdf5.STEPS", parser_params["STEPS"]), patch(
+        "src.persistence.prv_to_hdf5.MAX_READ_BYTES", parser_params["MAX_READ_BYTES"]
+    ), patch("src.persistence.prv_to_hdf5.MIN_ELEM", parser_params["MIN_ELEM"]):
 
         data = get_prv_test_traces()
+        format_converter = ParaverToHDF5()
         for test in data:
-            df_state, df_event, df_comm = parse_as_dataframe(test["Input"])
-            df_state = df_state.astype("int64")
-            df_event = df_event.astype("int64")
-            df_comm = df_comm.astype("int64")
-            assert test["states_records"].equals(df_state)
-            assert test["event_records"].equals(df_event)
-            assert test["comm_records"].equals(df_comm)
-
-
-@pytest.mark.parametrize("parser_params", all_parser_params)
-def no_test_parallel_prv_trace_parser(parser_params):
-    with patch("src.utils.prv_to_hdf5.STEPS", parser_params["STEPS"]), patch(
-        "src.utils.prv_to_hdf5.MAX_READ_BYTES", parser_params["MAX_READ_BYTES"]
-    ), patch("src.utils.prv_to_hdf5.MIN_ELEM", parser_params["MIN_ELEM"]):
-
-        data = get_prv_test_traces()
-        for test in data:
-            df_state, df_event, df_comm = parallel_parse_as_dataframe(test["Input"])
+            df_state, df_event, df_comm = format_converter.parse_as_dataframe(test["Input"])
             df_state = df_state.astype("int64")
             df_event = df_event.astype("int64")
             df_comm = df_comm.astype("int64")

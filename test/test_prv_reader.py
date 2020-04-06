@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from src.reader import prv_header_parser
+from src.persistence.prv_reader import ParaverReader
 
 
 def compare_trace_metadata(trace_a, trace_b):
@@ -22,18 +22,17 @@ def compare_trace_metadata(trace_a, trace_b):
     return False
 
 
-@pytest.fixture
-def header_test_data():
+def prv_header_test_data():
     data = []
     # os.chdir("test/test_files/headers")
-    for input in sorted(os.listdir("test/test_files/headers")):
-        input = "test/test_files/headers/" + input
-        if "6.in" in input:
+    for file in sorted(os.listdir("test/test_files/headers")):
+        file = "test/test_files/headers/" + file
+        if "6.in" in file:
             header = None
             sol = None
-            with open(input, "r") as input:
-                header = input.readline()
-            with open(f"{input.name[:-2]}sol.json", "r") as output:
+            with open(file, "r") as input_file:
+                header = input_file.readline()
+            with open(f"{input_file.name[:-2]}sol.json", "r") as output:
                 sol = json.load(output)
 
             data.append(
@@ -44,6 +43,8 @@ def header_test_data():
     return data
 
 
-def test_header_parser(header_test_data):
+def test_prv_header_parser():
+    header_test_data = prv_header_test_data()
+    header_parser = ParaverReader()
     for header, expected_header in header_test_data:
-        assert expected_header == prv_header_parser(header)
+        assert expected_header == header_parser.header_parser(header)
