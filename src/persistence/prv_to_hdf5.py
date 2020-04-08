@@ -8,6 +8,7 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 
+from src.CONST import COL_STATE_RECORD, COL_EVENT_RECORD, COL_COMM_RECORD
 from src.persistence.format_converter import FormatConverter, chunk_reader, isplit
 
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
@@ -20,40 +21,6 @@ STATE_RECORD = "1"
 EVENT_RECORD = "2"
 COMM_RECORD = "3"
 
-COL_STATE_RECORD = [
-    "cpu_id",
-    "appl_id",
-    "task_id",
-    "thread_id",
-    "time_ini",
-    "time_fi",
-    "state",
-]
-COL_EVENT_RECORD = [
-    "cpu_id",
-    "appl_id",
-    "task_id",
-    "thread_id",
-    "time",
-    "event_t",
-    "event_v",
-]
-COL_COMM_RECORD = [
-    "cpu_send_id",
-    "ptask_send_id",
-    "task_send_id",
-    "thread_send_id",
-    "lsend",
-    "psend",
-    "cpu_recv_id",
-    "ptask_recv_id",
-    "task_recv_id",
-    "thread_recv_id",
-    "lrecv",
-    "precv",
-    "size",
-    "tag",
-]
 
 MB = 1024 * 1024
 GB = 1024 * 1024 * 1024
