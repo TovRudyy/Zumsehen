@@ -16,6 +16,23 @@ TRACES_DIR = "src/persistence/test/test_files/traces"
 files_dir = "src/persistence/test/test_files/traces"
 files = ["10MB.test.prv"]
 
+format_converter = ParaverToHDF5()
+
+
+def test_get_state_row():
+    state_row = "1:2:1:1:1:0:200:1"
+    assert [2, 1, 1, 1, 0, 200, 1] == format_converter.get_state_row(state_row)
+
+
+def test_get_event_row():
+    state_row = "1:2:1:1:1:0:200:1"
+    assert [2, 1, 1, 1, 0, 200, 1] == format_converter.get_event_row(state_row)
+
+
+def test_get_comm_row():
+    # TODO
+    pass
+
 
 def get_prv_test_traces():
     data = []
@@ -49,7 +66,6 @@ def test_seq_prv_trace_parser(parser_params):
     ), patch("src.persistence.prv_to_hdf5.MIN_ELEM", parser_params["MIN_ELEM"]):
 
         data = get_prv_test_traces()
-        format_converter = ParaverToHDF5()
         for test in data:
             df_state, df_event, df_comm = format_converter.parse_as_dataframe(test["Input"])
             df_state = df_state.astype("int64")
@@ -67,7 +83,6 @@ def assert_equals_if_rows(df1, df2):
 
 @pytest.mark.parametrize("use_dask", (False, True))
 def test_e2e_parse_and_read(use_dask):
-    format_converter = ParaverToHDF5()
     writer = Writer()
     reader = HDF5Reader()
     data = get_prv_test_traces()
