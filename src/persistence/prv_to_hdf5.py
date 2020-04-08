@@ -4,6 +4,7 @@ import os
 import time
 from typing import List, Tuple
 
+import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 
@@ -151,8 +152,15 @@ class ParaverToHDF5(FormatConverter):
 
         return arr_state, stcount, arr_event, evcount, arr_comm, commcount
 
-    def parse_as_dataframe(self, file: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """ Memory complexity: O_max(N+(3N*)), O_nominal(N). O_max could be 4*N/CHUNK if the algorithm wrote to disk after each CHUNK
+    def _create_dask_dataframe(self, df, columns):
+        if df.shape[0] > 0:
+            return dd.from_array(df, columns=columns)
+        else:
+            return dd.from_pandas(pd.DataFrame([], columns=columns), npartitions=1)
+
+    def parse_as_dataframe(self, file: str, use_dask=False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """ Memory complexity: O_max(N+(3N*)), O_nominal(N). O_max could be 4*N/CHUNK if the algorithm wrote to disk
+            after each CHUNK
             Computational complexity: O(N+c)
         """
         logger.debug(f"Using parameters: STEPS {STEPS}, MAX_READ_BYTES {MAX_READ_BYTES}, MIN_ELEM {MIN_ELEM}")
@@ -189,8 +197,13 @@ class ParaverToHDF5(FormatConverter):
             arr_comm.reshape((commcount // len(COL_COMM_RECORD), len(COL_COMM_RECORD))),
         )
 
-        df_state = pd.DataFrame(data=arr_state, columns=COL_STATE_RECORD)
-        df_event = pd.DataFrame(data=arr_event, columns=COL_EVENT_RECORD)
-        df_comm = pd.DataFrame(data=arr_comm, columns=COL_COMM_RECORD)
+        if use_dask:
+            df_state = self._create_dask_dataframe(arr_state, columns=COL_STATE_RECORD)
+            df_event = self._create_dask_dataframe(arr_event, columns=COL_EVENT_RECORD)
+            df_comm = self._create_dask_dataframe(arr_comm, columns=COL_COMM_RECORD)
+        else:
+            df_state = pd.DataFrame(data=arr_state, columns=COL_STATE_RECORD)
+            df_event = pd.DataFrame(data=arr_event, columns=COL_EVENT_RECORD)
+            df_comm = pd.DataFrame(data=arr_comm, columns=COL_COMM_RECORD)
 
         return df_state, df_event, df_comm

@@ -1,30 +1,37 @@
-import os
+import logging
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
 
+from src.persistence.hdf5_reader import HDF5Reader
 from src.persistence.prv_to_hdf5 import ParaverToHDF5
+from src.persistence.writer import Writer
+
+logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 TRACES_DIR = "src/persistence/test/test_files/traces"
 
-test_suite = [f"{TRACES_DIR}/{test}" for test in ["bt-mz.2x2.test.prv"]]
+files_dir = "src/persistence/test/test_files/traces"
+files = ["10MB.test.prv"]
 
 
 def get_prv_test_traces():
     data = []
-    for input in sorted(os.listdir(TRACES_DIR)):
-        input = f"{TRACES_DIR}/{input}"
-        # for input in test_suite:
-        if "test.prv" in input:
-            sol_state = pd.read_hdf(f"{input[:-8]}parsed.hdf", key="States").astype("int64")
-            sol_event = pd.read_hdf(f"{input[:-8]}parsed.hdf", key="Events").astype("int64")
-            sol_comm = pd.read_hdf(f"{input[:-8]}parsed.hdf", key="Comm").astype("int64")
-            data.append(
-                {"Input": input, "states_records": sol_state, "event_records": sol_event, "comm_records": sol_comm}
-            )
-        else:
-            pass
+    for test in files:
+        parsed_test = f"{files_dir}/{test[:-8]}parsed.hdf"
+        sol_state = pd.read_hdf(parsed_test, key="States").astype("int64")
+        sol_event = pd.read_hdf(parsed_test, key="Events").astype("int64")
+        sol_comm = pd.read_hdf(parsed_test, key="Comm").astype("int64")
+        data.append(
+            {
+                "Input": f"{files_dir}/{test}",
+                "states_records": sol_state,
+                "event_records": sol_event,
+                "comm_records": sol_comm,
+            }
+        )
     return data
 
 
@@ -51,3 +58,32 @@ def test_seq_prv_trace_parser(parser_params):
             assert test["states_records"].equals(df_state)
             assert test["event_records"].equals(df_event)
             assert test["comm_records"].equals(df_comm)
+
+
+def assert_equals_if_rows(df1, df2):
+    if df1.shape[0] != 0 and df2.shape[0] != 0:
+        assert df1.equals(df2)
+
+
+@pytest.mark.parametrize("use_dask", (False, True))
+def test_e2e_parse_and_read(use_dask):
+    format_converter = ParaverToHDF5()
+    writer = Writer()
+    reader = HDF5Reader()
+    data = get_prv_test_traces()
+    for test in data:
+        df_state, df_event, df_comm = format_converter.parse_as_dataframe(test["Input"], use_dask=use_dask)
+        file_name = test["Input"].split("/")[-1]
+        new_name = f"{files_dir}/tmp_{file_name}"
+        writer.dataframe_to_hdf5(new_name, df_state, df_event, df_comm)
+        df_state_tmp, df_event_tmp, df_comm_tmp = reader.parse_file(new_name, use_dask=use_dask)
+        if use_dask:
+            df_state, df_event, df_comm = df_state.compute(), df_event.compute(), df_comm.compute()
+            df_state_tmp, df_event_tmp, df_comm_tmp = (
+                df_state_tmp.compute(),
+                df_event_tmp.compute(),
+                df_comm_tmp.compute(),
+            )
+        assert_equals_if_rows(df_state, df_state_tmp)
+        assert_equals_if_rows(df_event, df_event_tmp)
+        assert_equals_if_rows(df_comm, df_comm_tmp)

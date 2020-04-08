@@ -2,6 +2,7 @@ black
 flake8
 pytest
 pandas
+dask
 numpy
 xlrd
 tables
