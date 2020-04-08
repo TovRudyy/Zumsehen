@@ -1,5 +1,10 @@
+import logging
+
 import dask.dataframe as dd
 import pandas as pd
+
+logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class Writer:
@@ -7,7 +12,7 @@ class Writer:
         if isinstance(df, dd.DataFrame):
             df = df.compute()
         if df.shape[0] > 0:
-            df.to_hdf(*args, **kwargs)
+            df.to_hdf(index=False, *args, **kwargs)
         else:
             pass
 

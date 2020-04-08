@@ -1,4 +1,5 @@
 import dask.dataframe as dd
+import numpy as np
 import pandas as pd
 
 from src.persistence.reader import Reader
@@ -9,7 +10,7 @@ def _try_read_hdf(file, key, use_dask):
         try:
             return dd.read_hdf(file, key=key)
         except ValueError:
-            return dd.from_pandas(pd.DataFrame([]), npartitions=1)
+            return dd.from_array(np.array([[]]))
     else:
         try:
             return pd.read_hdf(file, key=key)

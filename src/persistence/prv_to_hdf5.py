@@ -8,7 +8,7 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 
-from src.CONST import COL_STATE_RECORD, COL_EVENT_RECORD, COL_COMM_RECORD
+from src.CONST import COL_COMM_RECORD, COL_EVENT_RECORD, COL_STATE_RECORD
 from src.persistence.format_converter import FormatConverter, chunk_reader, isplit
 
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
@@ -123,7 +123,7 @@ class ParaverToHDF5(FormatConverter):
         if df.shape[0] > 0:
             return dd.from_array(df, columns=columns)
         else:
-            return dd.from_pandas(pd.DataFrame([], columns=columns), npartitions=1)
+            return dd.from_array(np.array([[]]))
 
     def parse_as_dataframe(self, file: str, use_dask=False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """ Memory complexity: O_max(N+(3N*)), O_nominal(N). O_max could be 4*N/CHUNK if the algorithm wrote to disk
