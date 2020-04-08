@@ -21,6 +21,8 @@ def _check_attribute(attribute):
         raise Exception(f"Cannot filter by {attribute}. List of possible attributes: {', '.join(filter_attributes)}.")
 
 
+# this functions compute the bit mask of the DataFrame indices that meet the condition
+
 def _filter_equal(df, attribute, value):
     return df[attribute] == value
 
@@ -96,6 +98,10 @@ class Transformation:
         self.mask = None
 
     def add_operator(self, df, attribute, operator, *args):
+        """
+        Stores the result bit mask after adding an operator. Only filters in execute(), doesn't do any additional
+        computation besides computing the bit masks.
+        """
         _check_attribute(attribute)
         added_operator = self._operator_function[operator](df, attribute, *args)
         logger.debug(f"adding operator {attribute} {operator} {args}")
