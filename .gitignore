@@ -6,8 +6,7 @@
 
 # Python
 *.pyc
-src/__pycache__
-test/__pycache__
+*/__pycache__
 .eggs
 *.egg-info
 
@@ -22,7 +21,7 @@ venv
 .cache
 cache
 
-.pytest_cache/
+*.pytest_cache/
 
 pip.conf
 build/

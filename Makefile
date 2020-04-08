@@ -1,15 +1,22 @@
-SOURCES:=src/ test/
+SOURCE_DIR:=src/
+CORE_DIR:=${SOURCE_DIR}/core/
+PERSISTENCE_DIR:=${SOURCE_DIR}/persistence/
+INTERFACE_DIR:=${SOURCE_DIR}/interface/
+TEST_DIRS:=${CORE_DIR}/test ${PERSISTENCE_DIR}/test
 
 .PHONY: install
 install:
 	pip install -r requirements.txt
 
+#.PHONY: install-interface
+#install-interface:
+
 .PHONY: format
 format:
 	isort --apply
-	black --line-length 120 ${SOURCES}
-	flake8 ${SOURCES}
+	black --line-length 120 ${CORE_DIR} ${PERSISTENCE_DIR}
+	flake8 ${CORE_DIR} ${PERSISTENCE_DIR}
 
 .PHONY: test
 test:
-	pytest -svv test $(ARGS)
+	pytest -svv ${TEST_DIRS} $(ARGS)

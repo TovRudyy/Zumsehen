@@ -1,0 +1,6 @@
+{
+    "ExecTime": 20125743,
+    "Date": "10/04/2001 18:30",
+    "Nodes": [4,4],
+    "Apps": [[{"nThreads": 4, "node": 2}, {"nThreads": 4, "node": 1}], [{"nThreads": 4, "node": 2}]]
+}
