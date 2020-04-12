@@ -5,7 +5,7 @@ from src.Trace import Trace, TraceMetaData
 
 
 def parse_trace(trace_file):
-    file_format = trace_file.filename.rsplit(".", 1)[1].lower()
+    file_format = trace_file.rsplit(".", 1)[1].lower()
     if file_format == "prv":
         format_converter = ParaverToHDF5()
         df_state, df_event, df_comm = format_converter.parse_as_dataframe(trace_file, use_dask=True)

@@ -1,16 +1,27 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <div><p>Load a trace by clicking the Load trace button.</p></div>
-    <form action="{{ url_for('upload_trace') }}" method="post" enctype="multipart/form-data">
-        <input type="file" id="myTrace" name="trace_file">
+    <div><p>To load a trace, first enter the folder where traces are stored. Click load, and then choose a file.</p></div>
+    <form action="{{ url_for('select_path') }}" method="post">
+        <label for="traces_path">Enter the path to the traces folder:</label>
+        <input type="text" id="traces_path" name="traces_path" size="50">
+        <input type="submit">
+    </form>
+    <br><br>
+    <form action="{{ url_for('upload_trace') }}" method="post">
+        <label for="trace_options">Select a trace:</label>
+        <select id="trace_options" name="selected_trace">
+            {% for trace_option in trace_options %}
+                <option class="options">{{ trace_option }}</option>
+            {% endfor %}
+        </select>
         <input type="submit">
     </form>
     {% with messages = get_flashed_messages() %}
         {% if messages %}
             <div>
             {% for message in messages %}
-                <p class=flashes>{{ message }}</p>
+                <p class="flashes">{{ message }}</p>
             {% endfor %}
             </div>
         {% endif %}
