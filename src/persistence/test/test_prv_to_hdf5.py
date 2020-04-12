@@ -21,12 +21,12 @@ format_converter = ParaverToHDF5()
 
 def test_get_state_row():
     state_row = "1:2:1:1:1:0:200:1"
-    assert [2, 1, 1, 1, 0, 200, 1] == format_converter.get_state_row(state_row)
+    assert [2, 1, 1, 1, 0, 200, 1] == format_converter._get_state_row(state_row)
 
 
 def test_get_event_row():
     state_row = "1:2:1:1:1:0:200:1"
-    assert [2, 1, 1, 1, 0, 200, 1] == format_converter.get_event_row(state_row)
+    assert [2, 1, 1, 1, 0, 200, 1] == format_converter._get_event_row(state_row)
 
 
 def test_get_comm_row():

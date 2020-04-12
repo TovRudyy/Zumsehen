@@ -35,17 +35,17 @@ RESIZE = 1
 
 class ParaverToHDF5(FormatConverter):
     @staticmethod
-    def get_state_row(line: str) -> List:
+    def _get_state_row(line: str) -> List:
         # We discard the record type field
         return [int(x) for x in line.split(":")[1:]]
 
     @staticmethod
-    def get_comm_row(line: str) -> List:
+    def _get_comm_row(line: str) -> List:
         # We discard the record type field
         return [int(x) for x in line.split(":")[1:]]
 
     @staticmethod
-    def get_event_row(line: str) -> List:
+    def _get_event_row(line: str) -> List:
         # We discard the record type field
         record = [int(x) for x in line.split(":")[1:]]
         # The same Event record line can contain more than 1 Event
@@ -65,7 +65,7 @@ class ParaverToHDF5(FormatConverter):
             for record in records:
                 record_type = record[0]
                 if record_type == STATE_RECORD:
-                    state = ParaverToHDF5.get_state_row(record)
+                    state = ParaverToHDF5._get_state_row(record)
                     try:
                         arr_state[stcount : stcount + stpadding] = state
                     except ValueError:
@@ -76,7 +76,7 @@ class ParaverToHDF5(FormatConverter):
                 elif record_type == EVENT_RECORD:
                     # EVENT is a special type because we don't know how
                     # long will be the returned list
-                    events = ParaverToHDF5.get_event_row(record)
+                    events = ParaverToHDF5._get_event_row(record)
                     try:
                         arr_event[evcount : evcount + len(events)] = events
                     except ValueError:
@@ -85,7 +85,7 @@ class ParaverToHDF5(FormatConverter):
                         arr_event[evcount : evcount + len(events)] = events
                     evcount += len(events)
                 elif record_type == COMM_RECORD:
-                    comm = ParaverToHDF5.get_comm_row(record)
+                    comm = ParaverToHDF5._get_comm_row(record)
                     try:
                         arr_comm[commcount : commcount + commpadding] = comm
                     except ValueError:

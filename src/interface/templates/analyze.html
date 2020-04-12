@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div id="analyze_page">
+        <div id="maincontent">
+            <div id="current_trace">Current trace selected: {{ current_trace_text }}.</div>
+        </div>
+        <div id="rightmenu">
+            <div id="rightmenuelements">
+                <h3>Selected traces</h3>
+                <div id="traces_menu">
+                    {% for trace in traces %}
+                    <div><a href="{{ url_for('select_trace', selected_trace=trace) }}">{{ trace }}</a></div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

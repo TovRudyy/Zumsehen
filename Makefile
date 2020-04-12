@@ -20,3 +20,7 @@ format:
 .PHONY: test
 test:
 	pytest -svv ${TEST_DIRS} $(ARGS)
+
+.PHONY: start-interface
+start-interface:
+	bash scripts/start_interface.sh

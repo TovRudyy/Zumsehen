@@ -6,3 +6,5 @@ dask
 numpy
 xlrd
 tables
+flask
+werkzeug

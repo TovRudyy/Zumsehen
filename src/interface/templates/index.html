@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div><p>Load a trace by clicking the Load trace button.</p></div>
+    <form action="{{ url_for('upload_trace') }}" method="post" enctype="multipart/form-data">
+      <input type="file" id="myTrace" name="trace_file">
+      <input type="submit">
+    </form>
+{% endblock %}
