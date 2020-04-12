@@ -1,8 +1,6 @@
 import itertools
 from abc import ABC, abstractmethod
 
-from werkzeug.datastructures import FileStorage
-
 
 def isplit(iterable, part_size, group=list):
     """ Yields groups of length `part_size` of items found in iterator.
@@ -17,17 +15,15 @@ def isplit(iterable, part_size, group=list):
         yield tmp
 
 
-def chunk_reader(file, read_bytes: int):
-    if not isinstance(file, FileStorage):
-        file = open(file, "r")
-    # Discard the header
-    file.readline()
-    while True:
-        chunk = file.readlines(read_bytes)
-        if not chunk:
-            break
-        yield chunk
-    file.close()
+def chunk_reader(filename: str, read_bytes: int):
+    with open(filename, "r") as file:
+        # Discard the header
+        file.readline()
+        while True:
+            chunk = file.readlines(read_bytes)
+            if not chunk:
+                break
+            yield chunk
 
 
 class FormatConverter(ABC):

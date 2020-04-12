@@ -2,8 +2,8 @@ import logging
 import os
 from datetime import datetime
 
+from src.Trace import TraceMetaData
 from src.persistence.reader import Reader
-from src.TraceMetaData import TraceMetaData
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -76,6 +76,6 @@ class ParaverReader(Reader):
 
                 trace_exec_time, trace_date, trace_nodes, trace_apps = self.header_parser(header)
         except FileNotFoundError:
-            logger.error(f"Not able to access the file {file}")
+            logger.error(f"Not able to access the file {file}.")
 
         return TraceMetaData(trace_name, trace_path, trace_type, trace_exec_time, trace_date, trace_nodes, trace_apps)
