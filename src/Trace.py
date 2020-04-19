@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List
 
 import dask.dataframe as dd
@@ -16,7 +16,7 @@ class TraceMetaData:
     name: str = ""
     path: str = ""
     type: str = ""
-    exec_time: int = None
+    exec_time: timedelta = None
     date: datetime = None
     # len(Nodes) = #nodes | Nodes[0] = #CPUs of Node 1
     nodes: List[int] = None

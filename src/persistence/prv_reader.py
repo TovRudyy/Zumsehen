@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from src.Trace import TraceMetaData
 from src.persistence.reader import Reader
@@ -15,13 +15,11 @@ PARAVER_MAGIC_HEADER = "#Paraver"
 class ParaverReader(Reader):
     def header_date(self, header: str):
         date, _, other = header.replace("#Paraver (", "").replace("at ", "").partition("):")
-        date = datetime.strptime(date, "%d/%m/%Y %H:%M")
-        return date
+        return datetime.strptime(date, "%d/%m/%Y %H:%M")
 
     def header_time(self, header):
-        time, _, other = header[header.find("):") + 2 :].partition("_ns")
-        time = int(time)
-        return time
+        time_ns, _, other = header[header.find("):") + 2 :].partition("_ns")
+        return timedelta(microseconds=int(time_ns) / 1000)
 
     def header_nodes(self, header: str):
         nodes = header[header.find("_ns:") + 4 :]

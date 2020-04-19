@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import List, Optional
+from typing import Optional, Dict
 
 from flask import flash, redirect, render_template, request, url_for
 
@@ -12,7 +12,7 @@ logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 traces_path: Optional[str] = None
-traces: List[Trace] = []
+traces: Dict[str, Trace] = dict()
 current_trace: Optional[Trace] = None
 
 
@@ -30,14 +30,21 @@ def index():
     if traces_path is not None:
         files = [f for f in os.listdir(traces_path) if os.path.isfile(os.path.join(traces_path, f))]
         trace_options = [f for f in files if allowed_file(f)]
-    return render_template("index.html", trace_options=trace_options)
+    if traces_path is not None:
+        path_text = traces_path
+    else:
+        path_text = "No path selected yet."
+    return render_template("index.html", trace_options=trace_options, path_text=path_text)
 
 
 @app.route("/select_path", methods=["GET", "POST"])
 def select_path():
     global traces_path
     path = request.form.get("traces_path")
-    if not os.path.exists(path):
+    logger.debug(path)
+    if path == "" or path is None:
+        flash("Please introduce a path.")
+    elif not os.path.exists(path):
         flash("Path doesn't exist.")
     elif not os.path.isdir(path):
         flash("Path is not a directory.")
@@ -61,7 +68,7 @@ def upload_trace():
         trace = parse_trace(trace_file)
 
         current_trace = trace
-        traces.append(trace)
+        traces[trace.metadata.name] = trace
 
         flash(f"Trace {selected_trace} uploaded.")
         logger.info(f"Trace {selected_trace} uploaded.")
@@ -72,29 +79,27 @@ def upload_trace():
     return redirect(url_for("index"))
 
 
-def get_current_trace_text(trace):
-    if trace is not None:
-        return trace
-    else:
-        return "no trace selected"
-
-
 @app.route("/analyze")
 def analyze():
-    global traces, current_trace
     logger.info(traces)
-    traces_names = [trace.metadata.name for trace in traces]
-    current_trace_info = str(get_current_trace_text(current_trace))
-    return render_template("analyze.html", traces=traces_names, current_trace_info=current_trace_info)
+    return render_template("analyze.html", traces=traces, current_trace=current_trace)
 
 
 @app.route("/select_trace")
 def select_trace():
+    global current_trace
+    logger.info(request.args)
+    selected_trace_name = request.args["selected_trace_name"]
+    current_trace = traces[selected_trace_name]
+    return redirect(url_for("analyze"))
+
+
+@app.route("/drop_trace")
+def drop_trace():
     global traces, current_trace
     logger.info(request.args)
-    selected_trace = request.args["selected_trace"]
-    for trace in traces:
-        if trace.metadata.name == selected_trace:
-            current_trace = trace
-            break
+    droped_trace_name = request.args["droped_trace_name"]
+    if droped_trace_name == current_trace.metadata.name:
+        current_trace = None
+    del traces[droped_trace_name]
     return redirect(url_for("analyze"))
