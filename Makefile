@@ -19,7 +19,7 @@ format:
 
 .PHONY: test
 test:
-	pytest -svv ${TEST_DIRS} $(ARGS)
+	pytest -svvv ${TEST_DIRS} $(ARGS)
 
 .PHONY: start-interface
 start-interface:

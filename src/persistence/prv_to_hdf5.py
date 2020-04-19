@@ -8,14 +8,12 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 
-from src.CONST import COL_COMM_RECORD, COL_EVENT_RECORD, COL_STATE_RECORD
+from src.CONST import StateRecord, EventRecord, CommRecord
 from src.persistence.format_converter import FormatConverter, chunk_reader, isplit
 
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-# import pyextrae.sequential as pyextrae
 
 STATE_RECORD = "1"
 EVENT_RECORD = "2"
@@ -59,7 +57,7 @@ class ParaverToHDF5(FormatConverter):
         arr_state, arr_event, arr_comm = args
         stcount, evcount, commcount = 0, 0, 0
         # This is the padding between different records respectively
-        stpadding, commpadding, evpadding = len(COL_STATE_RECORD), len(COL_COMM_RECORD), len(COL_EVENT_RECORD) * 10
+        stpadding, commpadding, evpadding = len(StateRecord), len(CommRecord), len(EventRecord) * 10
         # The loop is divided in chunks of STEPS size
         for records in isplit(chunk, STEPS):
             for record in records:
@@ -119,13 +117,13 @@ class ParaverToHDF5(FormatConverter):
 
         return arr_state, stcount, arr_event, evcount, arr_comm, commcount
 
-    def _create_dask_dataframe(self, df, columns):
+    def _create_dask_dataframe(self, df: dd.DataFrame, columns):
         if df.shape[0] > 0:
             return dd.from_array(df, columns=columns)
         else:
             return dd.from_array(np.array([[]]))
 
-    def parse_as_dataframe(self, file: str, use_dask=False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def parse_as_dataframe(self, file: str, use_dask=True) -> Tuple[dd.DataFrame, dd.DataFrame, dd.DataFrame]:
         """ Memory complexity: O_max(N+(3N*)), O_nominal(N). O_max could be 4*N/CHUNK if the algorithm wrote to disk
             after each CHUNK
             Computational complexity: O(N+c)
@@ -159,18 +157,18 @@ class ParaverToHDF5(FormatConverter):
 
         # Reshape the arrays
         arr_state, arr_event, arr_comm = (
-            arr_state.reshape((stcount // len(COL_STATE_RECORD), len(COL_STATE_RECORD))),
-            arr_event.reshape((evcount // len(COL_EVENT_RECORD), len(COL_EVENT_RECORD))),
-            arr_comm.reshape((commcount // len(COL_COMM_RECORD), len(COL_COMM_RECORD))),
+            arr_state.reshape((stcount // len(StateRecord), len(StateRecord))),
+            arr_event.reshape((evcount // len(EventRecord), len(EventRecord))),
+            arr_comm.reshape((commcount // len(CommRecord), len(CommRecord))),
         )
 
         if use_dask:
-            df_state = self._create_dask_dataframe(arr_state, columns=COL_STATE_RECORD)
-            df_event = self._create_dask_dataframe(arr_event, columns=COL_EVENT_RECORD)
-            df_comm = self._create_dask_dataframe(arr_comm, columns=COL_COMM_RECORD)
+            df_state = self._create_dask_dataframe(arr_state, columns=StateRecord.all_attributes())
+            df_event = self._create_dask_dataframe(arr_event, columns=EventRecord.all_attributes())
+            df_comm = self._create_dask_dataframe(arr_comm, columns=CommRecord.all_attributes())
         else:
-            df_state = pd.DataFrame(data=arr_state, columns=COL_STATE_RECORD)
-            df_event = pd.DataFrame(data=arr_event, columns=COL_EVENT_RECORD)
-            df_comm = pd.DataFrame(data=arr_comm, columns=COL_COMM_RECORD)
+            df_state = pd.DataFrame(data=arr_state, columns=StateRecord.all_attributes())
+            df_event = pd.DataFrame(data=arr_event, columns=EventRecord.all_attributes())
+            df_comm = pd.DataFrame(data=arr_comm, columns=CommRecord.all_attributes())
 
         return df_state, df_event, df_comm
