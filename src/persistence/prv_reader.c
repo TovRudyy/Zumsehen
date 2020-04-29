@@ -11,7 +11,7 @@
 #define TRACE "/home/orudyy/apps/NPB3.4-MZ/NPB3.4-MZ-MPI/extrae/bt-mz.2x2-+A.x.prv"
 #define TRACE_HUGE "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimplExtrae5TimeSteps.01.FoA.prv"
 #define MAXBUF  32768  // The minimum size in bytes one line contain
-#define MIN_ELEM    524288 // The minimum size of one temporal array of *uint64_t 32MB
+#define MIN_ELEM    1000000 // The minimum size of one temporal array of *uint64_t 32MB
 #define MIN_BYTES_LINE  16
 #define STATE_RECORD_ELEM 7
 #define EVENT_RECORD_ELEM 7
@@ -186,27 +186,30 @@ void parse_prv_records(ChunkSet * chunkS, recordArray *state_array, recordArray 
         thread_data[i*3+2] = malloc(min_elem*sizeof(uint64_t *));
         nrows[i*3+2] = 0;
     }
-    #pragma omp parallel shared(thread_data, nthreads, chunkS) 
+    size_t nstates = 0, nevents = 0, ncomms = 0;
+
+    #pragma omp parallel shared(thread_data, nrows, nthreads, chunkS, nstates, nevents, ncomms) 
     {
         int thread_id = omp_get_thread_num();
         nthreads = omp_get_num_threads();
-        printf("I am thread %d of %d in total\n", thread_id, nthreads);
+        printf("I am thread %d of %d in team\n", thread_id, nthreads);
 
-        size_t nstates = 0, nevents = 0, ncomms = 0;
-        size_t *auxnstates, auxnevents, auxncomms;
+        size_t *auxnstates, *auxnevents, *auxncomms;
         auxnstates = nrows+thread_id*3;
         auxnevents = nrows+thread_id*3+1;
         auxncomms = nrows+thread_id*3+2;
         uint64_t **states = thread_data+thread_id*3;
         uint64_t **events = thread_data+thread_id*3+1;
         uint64_t **comms = thread_data+thread_id*3+2;
-
+        printf("AAA\n");
         size_t nchunks = chunkS->nchunks;
         #pragma omp for schedule (static), reduction(+: nstates, nevents, ncomms)
         for (int i = 0; i < nchunks; i++) {
             char **lines = (chunkS->chunk_array[i])->lines;
             size_t nlines = (chunkS->chunk_array[i])->nlines;
+            printf("BBB\n");
             for (int j = 0; j < nlines; j++) {
+                printf("Iteration: %d\n", j);
                 switch(get_record_type(lines[j])) {
                     case STATE_RECORD   :
                     states[nstates] = parse_state(lines[j]);
@@ -231,7 +234,7 @@ void parse_prv_records(ChunkSet * chunkS, recordArray *state_array, recordArray 
             *auxnevents = nevents;
             *auxncomms = ncomms;
         }
-
+        printf("XXX\n");
         if (thread_id = MASTER_THREAD) {
             state_array->array = realloc(thread_data[MASTER_THREAD], nstates*STATE_RECORD_ELEM*sizeof(uint64_t));
             state_array->rows = nstates;
