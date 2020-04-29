@@ -4,16 +4,23 @@
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <errno.h> 
 #include <inttypes.h>
+#include <omp.h>
 
 #define TRACE "/home/orudyy/apps/NPB3.4-MZ/NPB3.4-MZ-MPI/extrae/bt-mz.2x2-+A.x.prv"
 #define TRACE_HUGE "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimplExtrae5TimeSteps.01.FoA.prv"
 #define MAXBUF  32768  // The minimum size in bytes one line contain
-#define MIN_ELEM    40000000 //The minimum size of one temporal array of uint64_t 
+#define MIN_ELEM    524288 // The minimum size of one temporal array of *uint64_t 32MB
 #define MIN_BYTES_LINE  16
 #define STATE_RECORD_ELEM 7
 #define EVENT_RECORD_ELEM 7
 #define COMM_RECORD_ELEM 14
+#define MASTER_THREAD 0
+
+long long read_size;
+long long chunk_size;
+long long min_elem = MIN_ELEM;
 
 typedef struct Chunk {
     char **lines;
@@ -40,11 +47,20 @@ typedef struct ChunkSet {
 
 size_t split(ChunkSet *chunk_p, const char *file, const size_t size, const size_t chunksize, const size_t displ) {
     FILE *fp;
+    int retcode;
     size_t readB = 0, readcounter = 0;
 
-    fp = fopen(file, "r");
+    if ( (fp = fopen(file, "r")) == NULL) {
+        retcode = errno;
+        perror("split(...):fopen");
+        exit(retcode);
+    }
     // Move the file pointer acording tot the displacement
-    fseek(fp, displ, SEEK_SET);
+    if ( fseek(fp, displ, SEEK_SET) != 0) {
+        retcode = errno;
+        perror("split(...):fseek");
+        exit(retcode);
+    }
 
     char *line_buf = NULL;
     char **aux_lines_p = calloc(chunksize/MIN_BYTES_LINE, sizeof(char *));
@@ -92,7 +108,6 @@ size_t split(ChunkSet *chunk_p, const char *file, const size_t size, const size_
         (chunk_p->chunk_array)[numchunks] = lines_p;
         numchunks++;
     }
-
     // Realloc the chunk_pointer to its real size (free the last position if it's the case)
     chunk_p->chunk_array = realloc(chunk_p->chunk_array, sizeof(char **)*numchunks);
     chunk_p->nchunks = numchunks;
@@ -159,43 +174,86 @@ uint64_t *parse_comm(char *line) {
 }
 
 void parse_prv_records(ChunkSet * chunkS, recordArray *state_array, recordArray *event_array, recordArray *comm_array) {
-    size_t nstates = 0, nevents = 0, ncomms = 0;
-    uint64_t **states = malloc(MIN_ELEM*sizeof(uint64_t *));
-    uint64_t **events = malloc(MIN_ELEM*sizeof(uint64_t *));
-    uint64_t **comms = malloc(MIN_ELEM*sizeof(uint64_t *));
+    int nthreads = omp_get_max_threads();
+    printf("Max. number of threads: %d\n", nthreads);
+    uint64_t *thread_data[nthreads*3];
+    size_t nrows[nthreads*3];
+    for (int i = 0; i < nthreads; i++) {
+        thread_data[i*3] = malloc(min_elem*sizeof(uint64_t *));
+        nrows[i*3] = 0;
+        thread_data[i*3+1] = malloc(min_elem*sizeof(uint64_t *));
+        nrows[i*3+1] = 0;
+        thread_data[i*3+2] = malloc(min_elem*sizeof(uint64_t *));
+        nrows[i*3+2] = 0;
+    }
+    #pragma omp parallel shared(thread_data, nthreads, chunkS) 
+    {
+        int thread_id = omp_get_thread_num();
+        nthreads = omp_get_num_threads();
+        printf("I am thread %d of %d in total\n", thread_id, nthreads);
 
-    size_t nchunks = chunkS->nchunks;
-    for (int i = 0; i < nchunks; i++) {
-        char **lines = (chunkS->chunk_array[i])->lines;
-        size_t nlines = (chunkS->chunk_array[i])->nlines;
-        for (int j = 0; j < nlines; j++) {
-            switch(get_record_type(lines[j])) {
-                case STATE_RECORD   :
-                states[nstates] = parse_state(lines[j]);
-                nstates++;
-                break;
+        size_t nstates = 0, nevents = 0, ncomms = 0;
+        size_t *auxnstates, auxnevents, auxncomms;
+        auxnstates = nrows+thread_id*3;
+        auxnevents = nrows+thread_id*3+1;
+        auxncomms = nrows+thread_id*3+2;
+        uint64_t **states = thread_data+thread_id*3;
+        uint64_t **events = thread_data+thread_id*3+1;
+        uint64_t **comms = thread_data+thread_id*3+2;
 
-                case EVENT_RECORD   :
-                parse_event(lines[j], events, &nevents);
-                break;
-        
-                case COMM_RECORD    :
-                comms[ncomms] = parse_comm(lines[j]);
-                ncomms++;
-                break;
+        size_t nchunks = chunkS->nchunks;
+        #pragma omp for schedule (static), reduction(+: nstates, nevents, ncomms)
+        for (int i = 0; i < nchunks; i++) {
+            char **lines = (chunkS->chunk_array[i])->lines;
+            size_t nlines = (chunkS->chunk_array[i])->nlines;
+            for (int j = 0; j < nlines; j++) {
+                switch(get_record_type(lines[j])) {
+                    case STATE_RECORD   :
+                    states[nstates] = parse_state(lines[j]);
+                    nstates++;
+                    break;
 
-                default :
-                printf("ERROR: Invalid/Not supported record type in the trace\n");
-                break;
+                    case EVENT_RECORD   :
+                    parse_event(lines[j], events, &nevents);
+                    break;
+            
+                    case COMM_RECORD    :
+                    comms[ncomms] = parse_comm(lines[j]);
+                    ncomms++;
+                    break;
+
+                    default :
+                    printf("WARNING: Invalid/Not supported record type in the trace\n");
+                    break;
+                }
+            }
+            *auxnstates = nstates;
+            *auxnevents = nevents;
+            *auxncomms = ncomms;
+        }
+
+        if (thread_id = MASTER_THREAD) {
+            state_array->array = realloc(thread_data[MASTER_THREAD], nstates*STATE_RECORD_ELEM*sizeof(uint64_t));
+            state_array->rows = nstates;
+            event_array->array = realloc(thread_data[MASTER_THREAD+1], nevents*EVENT_RECORD_ELEM*sizeof(uint64_t));
+            event_array->rows = nevents;
+            comm_array->array = realloc(thread_data[MASTER_THREAD+2], ncomms*COMM_RECORD_ELEM*sizeof(uint64_t));
+            comm_array->rows = ncomms;
+            
+            size_t st_dspl, ev_dspl, cmm_dspl;
+            st_dspl = nrows[MASTER_THREAD*3];
+            ev_dspl = nrows[MASTER_THREAD*3+1];
+            cmm_dspl = nrows[MASTER_THREAD*3+2];
+            for (int i = 1; i < nthreads; i++) {
+                memcpy(state_array->array, thread_data[i*3]+st_dspl, nrows[i*3]*STATE_RECORD_ELEM*sizeof(uint64_t));
+                memcpy(event_array->array, thread_data[i*3+1]+ev_dspl, nrows[i*3+1]*EVENT_RECORD_ELEM*sizeof(uint64_t));
+                memcpy(comm_array->array, thread_data[i*3+2]+cmm_dspl, nrows[i*3+2]*COMM_RECORD_ELEM*sizeof(uint64_t));
+                st_dspl += nrows[i*3];
+                ev_dspl += nrows[i*3+1];
+                cmm_dspl += nrows[i*3+2];
             }
         }
     }
-    state_array->array = realloc(states, nstates*STATE_RECORD_ELEM*sizeof(uint64_t));
-    state_array->rows = nstates;
-    event_array->array = realloc(events, nevents*EVENT_RECORD_ELEM*sizeof(uint64_t));
-    event_array->rows = nevents;
-    comm_array->array = realloc(comms, ncomms*COMM_RECORD_ELEM*sizeof(uint64_t));
-    comm_array->rows = ncomms;
 }
 
 void write_down(const char *output, const recordArray *states, const recordArray *events, const recordArray *comms) {
