@@ -7,20 +7,24 @@
 #include <errno.h> 
 #include <inttypes.h>
 #include <omp.h>
+#include "hdf5.h"
 
 #define TRACE "/home/orudyy/apps/NPB3.4-MZ/NPB3.4-MZ-MPI/extrae/bt-mz.2x2-+A.x.prv"
 #define TRACE_HUGE "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimplExtrae5TimeSteps.01.FoA.prv"
-#define MAXBUF  32768  // The minimum size in bytes one line contain
-#define MIN_ELEM    1000000 // The minimum size of one temporal array of *uint64_t 32MB
+#define MAXBUF  32768
+#define DEF_CHUNK_SIZE  262144000
+#define DEF_READ_SIZE   4294967296
 #define MIN_BYTES_LINE  16
 #define STATE_RECORD_ELEM 7
 #define EVENT_RECORD_ELEM 7
 #define COMM_RECORD_ELEM 14
 #define MASTER_THREAD 0
 
-long long read_size;
-long long chunk_size;
-long long min_elem = MIN_ELEM;
+int retcode;
+char retbuff[MAXBUF];
+long long __ReadSize = DEF_READ_SIZE;
+long long __ChunkSize = DEF_CHUNK_SIZE;
+long long __MinElem = DEF_READ_SIZE / MIN_BYTES_LINE;
 
 typedef struct Chunk {
     char **lines;
@@ -47,7 +51,6 @@ typedef struct ChunkSet {
 
 size_t split(ChunkSet *chunk_p, const char *file, const size_t size, const size_t chunksize, const size_t displ) {
     FILE *fp;
-    int retcode;
     size_t readB = 0, readcounter = 0;
 
     if ( (fp = fopen(file, "r")) == NULL) {
@@ -119,9 +122,12 @@ size_t split(ChunkSet *chunk_p, const char *file, const size_t size, const size_
 
 prv_states get_record_type(char *line) {
     char record = line[0];
-    if ('0' <= record && '9' >= record)
-        return (prv_states)atoi(&record);
-    else return INVALID_RECORD;
+    if ('0' <= record && '9' >= record) {
+        return record - '0';
+    }
+    else {
+        return INVALID_RECORD;
+    }
 }
 
 uint64_t *parse_state(char *line) {
@@ -174,43 +180,43 @@ uint64_t *parse_comm(char *line) {
 }
 
 void parse_prv_records(ChunkSet * chunkS, recordArray *state_array, recordArray *event_array, recordArray *comm_array) {
-    int nthreads = omp_get_max_threads();
-    printf("Max. number of threads: %d\n", nthreads);
-    uint64_t *thread_data[nthreads*3];
+    size_t nchunks = chunkS->nchunks;
+    int nthreads; 
+    // OMP_NUM_THREADS must be <= nchunks
+    nthreads = omp_get_max_threads() <= nchunks ? omp_get_max_threads() : nchunks;
+    uint64_t **thread_data[nthreads*3];
     size_t nrows[nthreads*3];
     for (int i = 0; i < nthreads; i++) {
-        thread_data[i*3] = malloc(min_elem*sizeof(uint64_t *));
+        thread_data[i*3] = malloc((__MinElem/nthreads)*sizeof(uint64_t **));
         nrows[i*3] = 0;
-        thread_data[i*3+1] = malloc(min_elem*sizeof(uint64_t *));
+        thread_data[i*3+1] = malloc((__MinElem/nthreads*2)*sizeof(uint64_t **));
         nrows[i*3+1] = 0;
-        thread_data[i*3+2] = malloc(min_elem*sizeof(uint64_t *));
+        thread_data[i*3+2] = malloc((__MinElem/nthreads)*sizeof(uint64_t **));
         nrows[i*3+2] = 0;
     }
     size_t nstates = 0, nevents = 0, ncomms = 0;
 
-    #pragma omp parallel shared(thread_data, nrows, nthreads, chunkS, nstates, nevents, ncomms) 
+    #pragma omp parallel num_threads(nthreads) shared(thread_data, nrows, nthreads, chunkS), reduction(+: nstates, nevents, ncomms)
     {
         int thread_id = omp_get_thread_num();
         nthreads = omp_get_num_threads();
-        printf("I am thread %d of %d in team\n", thread_id, nthreads);
-
+        #ifdef DEBUG
+        printf("I am thread %d of %d in the team\n", thread_id, nthreads);
+        #endif
         size_t *auxnstates, *auxnevents, *auxncomms;
-        auxnstates = nrows+thread_id*3;
-        auxnevents = nrows+thread_id*3+1;
-        auxncomms = nrows+thread_id*3+2;
-        uint64_t **states = thread_data+thread_id*3;
-        uint64_t **events = thread_data+thread_id*3+1;
-        uint64_t **comms = thread_data+thread_id*3+2;
-        printf("AAA\n");
-        size_t nchunks = chunkS->nchunks;
-        #pragma omp for schedule (static), reduction(+: nstates, nevents, ncomms)
+        auxnstates = &nrows[thread_id*3];
+        auxnevents = &nrows[thread_id*3+1];
+        auxncomms = &nrows[thread_id*3+2];
+        uint64_t **states = thread_data[thread_id*3];
+        uint64_t **events = thread_data[thread_id*3+1];
+        uint64_t **comms = thread_data[thread_id*3+2];
+        #pragma omp for schedule (static)
         for (int i = 0; i < nchunks; i++) {
             char **lines = (chunkS->chunk_array[i])->lines;
             size_t nlines = (chunkS->chunk_array[i])->nlines;
-            printf("BBB\n");
             for (int j = 0; j < nlines; j++) {
-                printf("Iteration: %d\n", j);
-                switch(get_record_type(lines[j])) {
+                prv_states result = get_record_type(lines[j]);
+                switch(result) {
                     case STATE_RECORD   :
                     states[nstates] = parse_state(lines[j]);
                     nstates++;
@@ -225,8 +231,10 @@ void parse_prv_records(ChunkSet * chunkS, recordArray *state_array, recordArray 
                     ncomms++;
                     break;
 
-                    default :
+                    case INVALID_RECORD :
+                    #ifdef DEBUG
                     printf("WARNING: Invalid/Not supported record type in the trace\n");
+                    #endif
                     break;
                 }
             }
@@ -234,28 +242,27 @@ void parse_prv_records(ChunkSet * chunkS, recordArray *state_array, recordArray 
             *auxnevents = nevents;
             *auxncomms = ncomms;
         }
-        printf("XXX\n");
-        if (thread_id = MASTER_THREAD) {
-            state_array->array = realloc(thread_data[MASTER_THREAD], nstates*STATE_RECORD_ELEM*sizeof(uint64_t));
-            state_array->rows = nstates;
-            event_array->array = realloc(thread_data[MASTER_THREAD+1], nevents*EVENT_RECORD_ELEM*sizeof(uint64_t));
-            event_array->rows = nevents;
-            comm_array->array = realloc(thread_data[MASTER_THREAD+2], ncomms*COMM_RECORD_ELEM*sizeof(uint64_t));
-            comm_array->rows = ncomms;
-            
-            size_t st_dspl, ev_dspl, cmm_dspl;
-            st_dspl = nrows[MASTER_THREAD*3];
-            ev_dspl = nrows[MASTER_THREAD*3+1];
-            cmm_dspl = nrows[MASTER_THREAD*3+2];
-            for (int i = 1; i < nthreads; i++) {
-                memcpy(state_array->array, thread_data[i*3]+st_dspl, nrows[i*3]*STATE_RECORD_ELEM*sizeof(uint64_t));
-                memcpy(event_array->array, thread_data[i*3+1]+ev_dspl, nrows[i*3+1]*EVENT_RECORD_ELEM*sizeof(uint64_t));
-                memcpy(comm_array->array, thread_data[i*3+2]+cmm_dspl, nrows[i*3+2]*COMM_RECORD_ELEM*sizeof(uint64_t));
-                st_dspl += nrows[i*3];
-                ev_dspl += nrows[i*3+1];
-                cmm_dspl += nrows[i*3+2];
-            }
-        }
+    }
+    state_array->array = realloc(thread_data[MASTER_THREAD], nstates*STATE_RECORD_ELEM*sizeof(uint64_t));
+    state_array->rows = nstates;
+    event_array->array = realloc(thread_data[MASTER_THREAD+1], nevents*EVENT_RECORD_ELEM*sizeof(uint64_t));
+    event_array->rows = nevents;
+    comm_array->array = realloc(thread_data[MASTER_THREAD+2], ncomms*COMM_RECORD_ELEM*sizeof(uint64_t));
+    comm_array->rows = ncomms;
+    size_t st_dspl, ev_dspl, cmm_dspl;
+    st_dspl = nrows[MASTER_THREAD*3];
+    ev_dspl = nrows[MASTER_THREAD*3+1];
+    cmm_dspl = nrows[MASTER_THREAD*3+2];
+    for (int i = 1; i < nthreads; i++) {
+        memcpy(&(state_array->array[st_dspl]), thread_data[i*3], nrows[i*3]*STATE_RECORD_ELEM*sizeof(uint64_t));
+        free(thread_data[i*3]);
+        memcpy(&(event_array->array[ev_dspl]), thread_data[i*3+1], nrows[i*3+1]*EVENT_RECORD_ELEM*sizeof(uint64_t));
+        free(thread_data[i*3+1]);
+        memcpy(&(comm_array->array[cmm_dspl]), thread_data[i*3+2], nrows[i*3+2]*COMM_RECORD_ELEM*sizeof(uint64_t));
+        free(thread_data[i*3+2]);
+        st_dspl += nrows[i*3];
+        ev_dspl += nrows[i*3+1];
+        cmm_dspl += nrows[i*3+2];
     }
 }
 
@@ -279,16 +286,126 @@ void write_down(const char *output, const recordArray *states, const recordArray
     fclose(fptr);
 }
 
-int main(void) {
-    size_t done;
+void get_env() {
+    char __debug_buffer[MAXBUF];
+    size_t ret = 0;
+    char * env;
+    ret += sprintf(&__debug_buffer[0], "Env. value ZMSHN_CHUNK_SIZE:\t");
+    if ((env = getenv("ZMSHN_CHUNK_SIZE")) != NULL) {
+         ret += sprintf(&__debug_buffer[ret], "defined (%s)\n", env);
+        __ChunkSize = atoll(env);
+    }
+    else {
+        ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld)\n", DEF_CHUNK_SIZE);
+        __ChunkSize = DEF_CHUNK_SIZE;
+    }
+    ret += sprintf(&__debug_buffer[ret], "Env. value ZMSHN_READ_SIZE:\t");
+    if ((env = getenv("ZMSHN_READ_SIZE")) != NULL) {
+         ret += sprintf(&__debug_buffer[ret], "defined (%s)\n", env);
+        __ReadSize = atoll(env);
+    }
+    else {
+        ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld)\n", DEF_READ_SIZE);
+        __ReadSize = DEF_READ_SIZE;
+    }
+    #ifdef DEBUG
+    printf(__debug_buffer);
+    #endif
+    __MinElem = __ReadSize / MIN_BYTES_LINE;
+}
+
+int main(int argc, char **argv) {
+    size_t read_bytes = 0;
     ChunkSet *chunkS = malloc(sizeof(ChunkSet));
-    done = split(chunkS, TRACE, 1024*1024*1024*1, 1024*1024*100, 0);
-    printf("Number of chunks and lines: %u, %u. Procesed bytes: %u\n", chunkS->nchunks, (chunkS->chunk_array[0])->nlines, done);
-    recordArray *states, *events, *comms;
-    states = malloc(sizeof(recordArray));
-    events = malloc(sizeof(recordArray));
-    comms = malloc(sizeof(recordArray));
-    parse_prv_records(chunkS, states, events, comms);
-    write_down("trace2.bin", states, events, comms);
+    get_env();
+    herr_t status;
+    hid_t file_id;
+    hid_t record_group_id;
+    hid_t dataspaces_id[3];
+    hid_t props[3];
+    hid_t datasets_id[3];
+    hsize_t chunk_dimms[3][2] = {__MinElem, STATE_RECORD_ELEM, __MinElem*2,EVENT_RECORD_ELEM, __MinElem, COMM_RECORD_ELEM};
+    hsize_t dimms[3][2] = {0, STATE_RECORD_ELEM, 0, EVENT_RECORD_ELEM, 0, COMM_RECORD_ELEM};
+    hsize_t max_dimms[3][2] = {H5S_UNLIMITED, STATE_RECORD_ELEM, H5S_UNLIMITED, EVENT_RECORD_ELEM, H5S_UNLIMITED, COMM_RECORD_ELEM};
+    /* HDF5 file creation */
+    if ( (file_id = H5Fcreate(argv[1], H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0) {
+        retcode = errno;
+        sprintf(retbuff, "H5Fopen(%s, ...) Failed creating the file", argv[1]);
+        perror(retbuff);
+        exit(retcode);
+    }
+    /* HDF5 "/Records" group creation */
+    record_group_id = H5Gcreate(file_id, "/Records", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    /* HDF5 dataspace creation for STATES, EVENTS and COMMs records */
+    dataspaces_id[0] = H5Screate_simple(2, dimms[0], max_dimms[0]);
+    dataspaces_id[1] = H5Screate_simple(2, dimms[1], max_dimms[1]);
+    dataspaces_id[2] = H5Screate_simple(2, dimms[2], max_dimms[2]);
+    /* HDF5 modify dataset creation properties (enable chunking) */
+    props[0] = H5Pcreate (H5P_DATASET_CREATE);
+    status = H5Pset_chunk(props[0], 2, chunk_dimms[0]);
+    props[1] = H5Pcreate (H5P_DATASET_CREATE);
+    status = H5Pset_chunk(props[1], 2, chunk_dimms[1]);
+    props[2] = H5Pcreate (H5P_DATASET_CREATE);
+    status = H5Pset_chunk(props[2], 2, chunk_dimms[2]);
+    /* HDF5 create 1 dataset for each record */
+    datasets_id[0] = H5Dcreate2 (record_group_id, "STATES", H5T_NATIVE_ULLONG, dataspaces_id[0], H5P_DEFAULT, props[0], H5P_DEFAULT);
+    datasets_id[1] = H5Dcreate2 (record_group_id, "EVENTS", H5T_NATIVE_ULLONG, dataspaces_id[1], H5P_DEFAULT, props[1], H5P_DEFAULT);
+    datasets_id[2] = H5Dcreate2 (record_group_id, "COMMUNICATIONS", H5T_NATIVE_ULLONG, dataspaces_id[2], H5P_DEFAULT, props[2], H5P_DEFAULT);
+
+    /* offsets to use later when extending HDF5 datasets */
+    hsize_t offsets[3][2] = {0, 0, 0, 0, 0, 0};
+    recordArray *records[3];
+    /* i=0 -> STATES; i=1 -> EVENTS; i=2 -> COMMS */
+    for (size_t i = 0; i < 3; i++)
+        records[i] = malloc(sizeof(recordArray));
+    while ( (read_bytes = split(chunkS, TRACE_HUGE, __ReadSize, __ChunkSize, read_bytes)) > 0) {
+        printf("Number of chunks and lines: %u, %u. Procesed bytes: %u\n", chunkS->nchunks, (chunkS->chunk_array[0])->nlines, read_bytes);
+        parse_prv_records(chunkS, records[0], records[1], records[2]);
+        /* HDF5 extend the dataset dimensions */
+        hid_t filespace, memspace;
+        for (size_t i = 0; i < 3; i++) {
+            dimms[i][1] += records[i]->rows;
+            status = H5Dset_extent(datasets_id[i], dimms[i]);   // Extent dataset's dimensions
+            filespace = H5Dget_space(datasets_id[i]);   // Refresh dataset data
+            hsize_t dimext[2];
+            switch (i) {
+            case 0: // STATE
+                dimext[0] = records[i]->rows; dimext[1] = STATE_RECORD_ELEM;
+                break;
+            case 1: // EVENT
+                dimext[0] = records[i]->rows; dimext[1] = EVENT_RECORD_ELEM;
+                break;
+            case 2: // COMM
+                dimext[0] = records[i]->rows; dimext[1] = COMM_RECORD_ELEM;
+            default:
+                break;
+            }
+            status = H5Sselect_hyperslab (filespace, H5S_SELECT_SET, offsets[i], NULL, dimext, NULL);    // Define where to add the new data in the dataset
+            memspace = H5Screate_simple (2, dimext, NULL);  // Allocate memory for the new data
+            status = H5Dwrite (datasets_id[i], H5T_NATIVE_ULLONG, memspace, filespace, H5P_DEFAULT, records[i]);    // Append new data to the dataset
+            /* Free innecesarry data structures */
+            status = H5Sclose (memspace);
+            status = H5Sclose (filespace);
+            offsets[i][0] += records[i]->rows;
+        }
+    }
+    /* Free innecessary data structures */
+    for (size_t i = 0; i < 3; i++) {
+        status = H5Dclose(datasets_id[i]);
+        status = H5Dclose(dataspaces_id[i]);
+        status = H5Pclose(props[i]);
+    }
+    status = H5Fclose(file_id);
+    // hid_t file_id, dataset_id;
+    // file_id = H5Fcreate("test.h5", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    // H5Fclose(file_id);
+    // for (int i = 0; i < events->rows; i++) {
+    //     for (int j = 0; j < EVENT_RECORD_ELEM; j++) {
+    //         printf("%"PRIu64":", events->array[i][j]);
+    //     }
+    //     printf("\n");
+
+    // }
+
     return 0;
 }
