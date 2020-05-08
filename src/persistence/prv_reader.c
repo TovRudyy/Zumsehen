@@ -411,14 +411,6 @@ void write_records_to_HDF5(const hid_t datasets[3], hsize_t dimms[3][2], hsize_t
         status = H5Sselect_hyperslab (filespace, H5S_SELECT_SET, offsets[i], NULL, dimext, NULL);    // Define where to add the new data in the dataset
         memspace = H5Screate_simple (2, dimext, NULL);  // Allocate memory for the new data
         status = H5Dwrite (datasets[i], H5T_NATIVE_ULLONG, memspace, filespace, H5P_DEFAULT, records[i]->array);    // Append new data to the dataset
-        // if (i == 1) {
-        //     for (int k = 0; k < records[i]->rows; k++) {
-        //     for (int j = 0; j < EVENT_RECORD_ELEM; j++) {
-        //         printf("%"PRIu64":", records[i]->array[k][j]);
-        //     }
-        //     printf("\n");
-        //     }
-        // }
         /* Free innecesarry data structures */
         status = H5Sclose (memspace);
         status = H5Sclose (filespace);
