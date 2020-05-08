@@ -6,31 +6,34 @@
 #include <ctype.h>
 #include <errno.h> 
 #include <inttypes.h>
+
+#ifdef PROFILING
+#include <sys/time.h>
+#define REGISTER_TIME(__t) gettimeofday(__t, NULL)
+#define GET_ELAPSED_TIME(__t1, __t2) ((__t2).tv_sec + (__t2).tv_usec/1000000.0) - ((__t1).tv_sec + (__t1).tv_usec/1000000.0)
+#endif
+
 #include <omp.h>
 #include "hdf5.h"
 
-#define TRACE "/home/orudyy/apps/NPB3.4-MZ/NPB3.4-MZ-MPI/extrae/bt-mz.2x2-+A.x.prv"
-#define TRACE_HUGE "/home/orudyy/apps/OpenFoam-Ashee/traces/rhoPimplExtrae5TimeSteps.01.FoA.prv"
 #define MAXBUF  32768
 #define DEF_CHUNK_SIZE  262144000
 #define DEF_READ_SIZE   4294967296
 #define MIN_BYTES_LINE  16
+#define DEF_MAX_HDF5_CHUNK_SIZE 1638400
 #define STATE_RECORD_ELEM 7
 #define EVENT_RECORD_ELEM 7
 #define COMM_RECORD_ELEM 14
 #define MASTER_THREAD 0
 
 int retcode;
+herr_t status;
+
 char retbuff[MAXBUF];
 long long __ReadSize = DEF_READ_SIZE;
 long long __ChunkSize = DEF_CHUNK_SIZE;
 long long __MinElem = DEF_READ_SIZE / MIN_BYTES_LINE;
-
-typedef struct Chunk {
-    char **lines;
-    size_t nlines;
-} Chunk;
-
+long long __MaxHDF5ChunkSize = DEF_MAX_HDF5_CHUNK_SIZE;
 
 typedef enum {
     STATE_RECORD    =   1,
@@ -40,9 +43,14 @@ typedef enum {
 } prv_states;
 
 typedef struct recordArray {
-    uint64_t **array;
+    uint64_t *array;
     size_t rows;
 } recordArray;
+
+typedef struct Chunk {
+    char **lines;
+    size_t nlines;
+} Chunk;
 
 typedef struct ChunkSet {
     Chunk **chunk_array;
@@ -50,6 +58,10 @@ typedef struct ChunkSet {
 } ChunkSet;
 
 size_t split(ChunkSet *chunk_p, const char *file, const size_t size, const size_t chunksize, const size_t displ) {
+    #ifdef PROFILING
+    struct timeval start, end;
+    REGISTER_TIME(&start);
+    #endif
     FILE *fp;
     size_t readB = 0, readcounter = 0;
 
@@ -58,7 +70,7 @@ size_t split(ChunkSet *chunk_p, const char *file, const size_t size, const size_
         perror("split(...):fopen");
         exit(retcode);
     }
-    // Move the file pointer acording tot the displacement
+    /* Move the file pointer acording tot the displacement */
     if ( fseek(fp, displ, SEEK_SET) != 0) {
         retcode = errno;
         perror("split(...):fseek");
@@ -73,7 +85,7 @@ size_t split(ChunkSet *chunk_p, const char *file, const size_t size, const size_
     size_t numchunks = 0;
 
     while( readB < size && 0 < (readcounter = fread(chunk_buf, 1, chunksize, fp))) {
-        // Check if chunk is aligned to line
+        /* Check if chunk is aligned to line */
         if (chunk_buf[readcounter-1] != '\n' || chunk_buf[readcounter-1] != '\0') {
             size_t back = 0;
             int flag = 0;
@@ -103,7 +115,7 @@ size_t split(ChunkSet *chunk_p, const char *file, const size_t size, const size_
             }
         }
 
-        // We have processed a chunk
+        /* We have processed a chunk */
         Chunk *lines_p = malloc(sizeof(Chunk));
         lines_p->lines = calloc(numlines, sizeof(char *));
         lines_p->nlines = numlines;
@@ -111,11 +123,15 @@ size_t split(ChunkSet *chunk_p, const char *file, const size_t size, const size_
         (chunk_p->chunk_array)[numchunks] = lines_p;
         numchunks++;
     }
-    // Realloc the chunk_pointer to its real size (free the last position if it's the case)
+    /* Realloc the chunk_pointer to its real size (free the last position if it's the case) */
     chunk_p->chunk_array = realloc(chunk_p->chunk_array, sizeof(char **)*numchunks);
     chunk_p->nchunks = numchunks;
     free(aux_lines_p);
     free(chunk_buf);
+    #ifdef PROFILING
+    REGISTER_TIME(&end);
+    printf("Elapsed time reading 1 block:    %.3f sec\n", GET_ELAPSED_TIME(start, end));
+    #endif
     return readB;
 }
 
@@ -143,8 +159,7 @@ uint64_t *parse_state(char *line) {
     return state;
 }
 
-// Not constant amount of events in each line.
-// Thus, this routine returns a pointer with *nevents rows
+/* Not constant amount of events in each line. Thus, this routine returns a pointer with *nevents rows */
 void parse_event(char *line, uint64_t **events, size_t *nevents) {
     char *next, *nnext, *rest = line;
     uint64_t *event = calloc(EVENT_RECORD_ELEM, sizeof(uint64_t));
@@ -180,10 +195,17 @@ uint64_t *parse_comm(char *line) {
 }
 
 void parse_prv_records(ChunkSet * chunkS, recordArray *state_array, recordArray *event_array, recordArray *comm_array) {
+    #ifdef PROFILING
+    struct timeval start, end;
+    REGISTER_TIME(&start);
+    #endif
     size_t nchunks = chunkS->nchunks;
     int nthreads; 
     // OMP_NUM_THREADS must be <= nchunks
     nthreads = omp_get_max_threads() <= nchunks ? omp_get_max_threads() : nchunks;
+    #ifdef DEBUG
+    printf("DEBUG: Parallel parser using %d threads\n", nthreads);
+    #endif
     uint64_t **thread_data[nthreads*3];
     size_t nrows[nthreads*3];
     for (int i = 0; i < nthreads; i++) {
@@ -200,9 +222,6 @@ void parse_prv_records(ChunkSet * chunkS, recordArray *state_array, recordArray 
     {
         int thread_id = omp_get_thread_num();
         nthreads = omp_get_num_threads();
-        #ifdef DEBUG
-        printf("I am thread %d of %d in the team\n", thread_id, nthreads);
-        #endif
         size_t *auxnstates, *auxnevents, *auxncomms;
         auxnstates = &nrows[thread_id*3];
         auxnevents = &nrows[thread_id*3+1];
@@ -232,7 +251,7 @@ void parse_prv_records(ChunkSet * chunkS, recordArray *state_array, recordArray 
                     break;
 
                     case INVALID_RECORD :
-                    #ifdef DEBUG
+                    #ifdef WARNING
                     printf("WARNING: Invalid/Not supported record type in the trace\n");
                     #endif
                     break;
@@ -243,54 +262,52 @@ void parse_prv_records(ChunkSet * chunkS, recordArray *state_array, recordArray 
             *auxncomms = ncomms;
         }
     }
-    state_array->array = realloc(thread_data[MASTER_THREAD], nstates*STATE_RECORD_ELEM*sizeof(uint64_t));
-    state_array->rows = nstates;
-    event_array->array = realloc(thread_data[MASTER_THREAD+1], nevents*EVENT_RECORD_ELEM*sizeof(uint64_t));
-    event_array->rows = nevents;
-    comm_array->array = realloc(thread_data[MASTER_THREAD+2], ncomms*COMM_RECORD_ELEM*sizeof(uint64_t));
-    comm_array->rows = ncomms;
+    /* After parsing the block it copies the data to a contiguous memory location */
+    state_array->array = malloc(nstates*STATE_RECORD_ELEM*sizeof(uint64_t));
+    state_array -> rows = nstates;
+    event_array->array = malloc(nevents*EVENT_RECORD_ELEM*sizeof(uint64_t));
+    event_array -> rows = nevents;
+    comm_array->array = malloc(ncomms*COMM_RECORD_ELEM*sizeof(uint64_t));
+    comm_array -> rows = ncomms;
     size_t st_dspl, ev_dspl, cmm_dspl;
-    st_dspl = nrows[MASTER_THREAD*3];
-    ev_dspl = nrows[MASTER_THREAD*3+1];
-    cmm_dspl = nrows[MASTER_THREAD*3+2];
-    for (int i = 1; i < nthreads; i++) {
-        memcpy(&(state_array->array[st_dspl]), thread_data[i*3], nrows[i*3]*STATE_RECORD_ELEM*sizeof(uint64_t));
-        free(thread_data[i*3]);
-        memcpy(&(event_array->array[ev_dspl]), thread_data[i*3+1], nrows[i*3+1]*EVENT_RECORD_ELEM*sizeof(uint64_t));
-        free(thread_data[i*3+1]);
-        memcpy(&(comm_array->array[cmm_dspl]), thread_data[i*3+2], nrows[i*3+2]*COMM_RECORD_ELEM*sizeof(uint64_t));
-        free(thread_data[i*3+2]);
+    st_dspl = ev_dspl = cmm_dspl = 0;
+    for (size_t i = 0; i < nthreads; i++) {
+        for (size_t j = 0; j < nrows[i*3]; j++) {
+            for (size_t k = 0; k < STATE_RECORD_ELEM; k++) {
+                (state_array->array)[(j+st_dspl)*STATE_RECORD_ELEM + k] = thread_data[i*3][j][k];   // (state_array->array)[j+st_dspl][k]
+            }
+            free(thread_data[i*3][j]);
+        }
         st_dspl += nrows[i*3];
+        free(thread_data[i*3]);
+        for (size_t j = 0; j < nrows[i*3+1]; j++) {
+            for (size_t k = 0; k < EVENT_RECORD_ELEM; k++) {
+                (event_array->array)[j*EVENT_RECORD_ELEM + k] = thread_data[i*3+1][j][k];
+            }
+            free(thread_data[i*3+1][j]);
+        }
         ev_dspl += nrows[i*3+1];
+        free(thread_data[i*3+1]);
+        for (size_t j = 0; j < nrows[i*3+2]; j++) {
+            for (size_t k = 0; k < COMM_RECORD_ELEM; k++) {
+                (comm_array->array)[(j+cmm_dspl)*COMM_RECORD_ELEM + k] = thread_data[i*3+2][j][k];
+            }
+            free(thread_data[i*3+2][j]);
+        }
         cmm_dspl += nrows[i*3+2];
+        free(thread_data[i*3+2]);
     }
-}
-
-void write_down(const char *output, const recordArray *states, const recordArray *events, const recordArray *comms) {
-    FILE * fptr = fopen(output, "w");
-
-    for (int i = 0; i < states->rows; i++) {
-        fwrite(&(states->array[i][0]), STATE_RECORD_ELEM*sizeof(uint64_t), 1, fptr);
-    }
-
-    for (int i = 0; i < events->rows; i++) {
-        // printf("%"PRIu64":", comms->array[i][j]);
-        fwrite(&(events->array[i][0]), EVENT_RECORD_ELEM*sizeof(uint64_t), 1, fptr);
-    }
-
-    for (int i = 0; i < comms->rows; i++) {
-        // printf("%"PRIu64":", comms->array[i][j]);
-        fwrite(&(comms->array[i][0]), COMM_RECORD_ELEM*sizeof(uint64_t), 1, fptr);
-    }
-
-    fclose(fptr);
+    #ifdef PROFILING
+    REGISTER_TIME(&end);
+    printf("Elapsed time parsing 1 block:    %.3f sec\n", GET_ELAPSED_TIME(start, end));
+    #endif
 }
 
 void get_env() {
     char __debug_buffer[MAXBUF];
     size_t ret = 0;
     char * env;
-    ret += sprintf(&__debug_buffer[0], "Env. value ZMSHN_CHUNK_SIZE:\t");
+    ret += sprintf(&__debug_buffer[0], "DEBUG: Env. value ZMSHN_CHUNK_SIZE:\t");
     if ((env = getenv("ZMSHN_CHUNK_SIZE")) != NULL) {
          ret += sprintf(&__debug_buffer[ret], "defined (%s)\n", env);
         __ChunkSize = atoll(env);
@@ -299,7 +316,7 @@ void get_env() {
         ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld)\n", DEF_CHUNK_SIZE);
         __ChunkSize = DEF_CHUNK_SIZE;
     }
-    ret += sprintf(&__debug_buffer[ret], "Env. value ZMSHN_READ_SIZE:\t");
+    ret += sprintf(&__debug_buffer[ret], "DEBUG: Env. value ZMSHN_READ_SIZE:\t");
     if ((env = getenv("ZMSHN_READ_SIZE")) != NULL) {
          ret += sprintf(&__debug_buffer[ret], "defined (%s)\n", env);
         __ReadSize = atoll(env);
@@ -308,104 +325,155 @@ void get_env() {
         ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld)\n", DEF_READ_SIZE);
         __ReadSize = DEF_READ_SIZE;
     }
+    ret += sprintf(&__debug_buffer[ret], "DEBUG: Env. value ZMSHN_MAX_HDF5_CHUNK_SIZE:\t");
+    if ((env = getenv("ZMSHN_MAX_HDF5_CHUNK_SIZE")) != NULL) {
+         ret += sprintf(&__debug_buffer[ret], "defined (%s)\n", env);
+        __MaxHDF5ChunkSize = atoll(env);
+    }
+    else {
+        ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld)\n", DEF_MAX_HDF5_CHUNK_SIZE);
+        __MaxHDF5ChunkSize = DEF_MAX_HDF5_CHUNK_SIZE;
+    }
     #ifdef DEBUG
     printf(__debug_buffer);
     #endif
     __MinElem = __ReadSize / MIN_BYTES_LINE;
 }
 
-int main(int argc, char **argv) {
-    size_t read_bytes = 0;
-    ChunkSet *chunkS = malloc(sizeof(ChunkSet));
-    get_env();
-    herr_t status;
+hid_t create_HDF5(const char * name) {
     hid_t file_id;
-    hid_t record_group_id;
-    hid_t dataspaces_id[3];
-    hid_t props[3];
-    hid_t datasets_id[3];
-    hsize_t chunk_dimms[3][2] = {__MinElem, STATE_RECORD_ELEM, __MinElem*2,EVENT_RECORD_ELEM, __MinElem, COMM_RECORD_ELEM};
-    hsize_t dimms[3][2] = {0, STATE_RECORD_ELEM, 0, EVENT_RECORD_ELEM, 0, COMM_RECORD_ELEM};
-    hsize_t max_dimms[3][2] = {H5S_UNLIMITED, STATE_RECORD_ELEM, H5S_UNLIMITED, EVENT_RECORD_ELEM, H5S_UNLIMITED, COMM_RECORD_ELEM};
     /* HDF5 file creation */
-    if ( (file_id = H5Fcreate(argv[1], H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0) {
-        retcode = errno;
-        sprintf(retbuff, "H5Fopen(%s, ...) Failed creating the file", argv[1]);
-        perror(retbuff);
-        exit(retcode);
-    }
-    /* HDF5 "/Records" group creation */
-    record_group_id = H5Gcreate(file_id, "/Records", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    /* HDF5 dataspace creation for STATES, EVENTS and COMMs records */
-    dataspaces_id[0] = H5Screate_simple(2, dimms[0], max_dimms[0]);
-    dataspaces_id[1] = H5Screate_simple(2, dimms[1], max_dimms[1]);
-    dataspaces_id[2] = H5Screate_simple(2, dimms[2], max_dimms[2]);
-    /* HDF5 modify dataset creation properties (enable chunking) */
-    props[0] = H5Pcreate (H5P_DATASET_CREATE);
-    status = H5Pset_chunk(props[0], 2, chunk_dimms[0]);
-    props[1] = H5Pcreate (H5P_DATASET_CREATE);
-    status = H5Pset_chunk(props[1], 2, chunk_dimms[1]);
-    props[2] = H5Pcreate (H5P_DATASET_CREATE);
-    status = H5Pset_chunk(props[2], 2, chunk_dimms[2]);
-    /* HDF5 create 1 dataset for each record */
-    datasets_id[0] = H5Dcreate2 (record_group_id, "STATES", H5T_NATIVE_ULLONG, dataspaces_id[0], H5P_DEFAULT, props[0], H5P_DEFAULT);
-    datasets_id[1] = H5Dcreate2 (record_group_id, "EVENTS", H5T_NATIVE_ULLONG, dataspaces_id[1], H5P_DEFAULT, props[1], H5P_DEFAULT);
-    datasets_id[2] = H5Dcreate2 (record_group_id, "COMMUNICATIONS", H5T_NATIVE_ULLONG, dataspaces_id[2], H5P_DEFAULT, props[2], H5P_DEFAULT);
+    file_id = H5Fcreate(name, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    return file_id;
+}
 
-    /* offsets to use later when extending HDF5 datasets */
-    hsize_t offsets[3][2] = {0, 0, 0, 0, 0, 0};
-    recordArray *records[3];
-    /* i=0 -> STATES; i=1 -> EVENTS; i=2 -> COMMS */
-    for (size_t i = 0; i < 3; i++)
-        records[i] = malloc(sizeof(recordArray));
-    while ( (read_bytes = split(chunkS, TRACE_HUGE, __ReadSize, __ChunkSize, read_bytes)) > 0) {
-        printf("Number of chunks and lines: %u, %u. Procesed bytes: %u\n", chunkS->nchunks, (chunkS->chunk_array[0])->nlines, read_bytes);
-        parse_prv_records(chunkS, records[0], records[1], records[2]);
-        /* HDF5 extend the dataset dimensions */
-        hid_t filespace, memspace;
-        for (size_t i = 0; i < 3; i++) {
-            dimms[i][1] += records[i]->rows;
-            status = H5Dset_extent(datasets_id[i], dimms[i]);   // Extent dataset's dimensions
-            filespace = H5Dget_space(datasets_id[i]);   // Refresh dataset data
-            hsize_t dimext[2];
-            switch (i) {
+hid_t create_HDF5_group(const hid_t parent, const char * name) {
+    hid_t group_id;
+    group_id = H5Gcreate(parent, name, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    return group_id;
+}
+
+/* Returns one dataset for STATES, EVENTS and COMM respectively */
+void create_datasets(const hid_t file, const hsize_t dimms[3][2], hid_t datasets[3], size_t size) {
+    hsize_t nrows;
+    nrows = ((size>>6) > __MaxHDF5ChunkSize) ? __MaxHDF5ChunkSize : (size>>6);
+    hsize_t chunk_dimms[3][2] = {nrows, STATE_RECORD_ELEM, nrows,EVENT_RECORD_ELEM, nrows, COMM_RECORD_ELEM};
+    hsize_t max_dimms[3][2] = {H5S_UNLIMITED, STATE_RECORD_ELEM, H5S_UNLIMITED, EVENT_RECORD_ELEM, H5S_UNLIMITED, COMM_RECORD_ELEM};   
+    for (size_t i = 0; i < 3; i++) {
+        /* HDF5 dataspace creation for STATES, EVENTS and COMMs records */
+        hid_t dataspaces = H5Screate_simple(2, dimms[i], max_dimms[i]);
+        /* HDF5 modify dataset creation properties (enable chunking) */
+        hid_t props = H5Pcreate (H5P_DATASET_CREATE);
+        status = H5Pset_chunk(props, 2, chunk_dimms[i]);
+        /* HDF5 create 1 dataset for each record */
+        switch (i) 
+        {
             case 0: // STATE
-                dimext[0] = records[i]->rows; dimext[1] = STATE_RECORD_ELEM;
+                datasets[i] = H5Dcreate2 (file, "STATES", H5T_NATIVE_ULLONG, dataspaces, H5P_DEFAULT, props, H5P_DEFAULT);
                 break;
             case 1: // EVENT
-                dimext[0] = records[i]->rows; dimext[1] = EVENT_RECORD_ELEM;
+                datasets[i] = H5Dcreate2 (file, "EVENTS", H5T_NATIVE_ULLONG, dataspaces, H5P_DEFAULT, props, H5P_DEFAULT);
                 break;
             case 2: // COMM
-                dimext[0] = records[i]->rows; dimext[1] = COMM_RECORD_ELEM;
+                datasets[i] = H5Dcreate2 (file, "COMMUNICATIONS", H5T_NATIVE_ULLONG, dataspaces, H5P_DEFAULT, props, H5P_DEFAULT);
             default:
                 break;
-            }
-            status = H5Sselect_hyperslab (filespace, H5S_SELECT_SET, offsets[i], NULL, dimext, NULL);    // Define where to add the new data in the dataset
-            memspace = H5Screate_simple (2, dimext, NULL);  // Allocate memory for the new data
-            status = H5Dwrite (datasets_id[i], H5T_NATIVE_ULLONG, memspace, filespace, H5P_DEFAULT, records[i]);    // Append new data to the dataset
-            /* Free innecesarry data structures */
-            status = H5Sclose (memspace);
-            status = H5Sclose (filespace);
-            offsets[i][0] += records[i]->rows;
         }
+        status = H5Sclose(dataspaces);
+        status = H5Pclose(props);
     }
-    /* Free innecessary data structures */
+}
+
+void write_records_to_HDF5(const hid_t datasets[3], hsize_t dimms[3][2], hsize_t offsets[3][2],  recordArray *records[3]) {
+    #ifdef PROFILING
+    struct timeval start, end;
+    REGISTER_TIME(&start);
+    #endif
+    /* HDF5 extend the dataset dimensions */
+    hid_t filespace, memspace;
     for (size_t i = 0; i < 3; i++) {
-        status = H5Dclose(datasets_id[i]);
-        status = H5Dclose(dataspaces_id[i]);
-        status = H5Pclose(props[i]);
+        dimms[i][0] += records[i]->rows;    // Update dimensions
+        status = H5Dset_extent(datasets[i], dimms[i]);   // Extent dataset's dimensions
+        filespace = H5Dget_space(datasets[i]);   // Refresh dataset data
+        hsize_t dimext[2];
+        switch (i) {
+        case 0: // STATE
+            dimext[0] = records[i]->rows; dimext[1] = STATE_RECORD_ELEM;
+            break;
+        case 1: // EVENT
+            dimext[0] = records[i]->rows; dimext[1] = EVENT_RECORD_ELEM;
+            break;
+        case 2: // COMM
+            dimext[0] = records[i]->rows; dimext[1] = COMM_RECORD_ELEM;
+        default:
+            break;
+        }
+        status = H5Sselect_hyperslab (filespace, H5S_SELECT_SET, offsets[i], NULL, dimext, NULL);    // Define where to add the new data in the dataset
+        memspace = H5Screate_simple (2, dimext, NULL);  // Allocate memory for the new data
+        status = H5Dwrite (datasets[i], H5T_NATIVE_ULLONG, memspace, filespace, H5P_DEFAULT, records[i]->array);    // Append new data to the dataset
+        // if (i == 1) {
+        //     for (int k = 0; k < records[i]->rows; k++) {
+        //     for (int j = 0; j < EVENT_RECORD_ELEM; j++) {
+        //         printf("%"PRIu64":", records[i]->array[k][j]);
+        //     }
+        //     printf("\n");
+        //     }
+        // }
+        /* Free innecesarry data structures */
+        status = H5Sclose (memspace);
+        status = H5Sclose (filespace);
+        offsets[i][0] += records[i]->rows;  // Update the offsets
     }
+    #ifdef PROFILING
+    REGISTER_TIME(&end);
+    printf("Elapsed time writing 1 block:    %.3f sec\n", GET_ELAPSED_TIME(start, end));
+    #endif
+}
+
+void parse_prv_to_hdf5(const char * prv, const char * hdf5) {
+    /* Parsing data structures */
+    size_t read_bytes = 0;
+    ChunkSet *chunkS = malloc(sizeof(ChunkSet));
+    recordArray *records[3];
+    for (size_t i = 0; i < 3; i++)  // i=0 -> STATES; i=1 -> EVENTS; i=2 -> COMMS
+        records[i] = malloc(sizeof(recordArray));
+    /* Writing to HDF5 data structures */
+    hid_t file_id, record_group_id, datasets_id[3];
+    hsize_t dimms[3][2] = {0, STATE_RECORD_ELEM, 0, EVENT_RECORD_ELEM, 0, COMM_RECORD_ELEM};
+    hsize_t offsets[3][2] = {0, 0, 0, 0, 0, 0}; // Offsets to use later when extending HDF5 datasets
+    int first = 1;  // Bool
+    file_id = create_HDF5(hdf5);
+    record_group_id = create_HDF5_group(file_id, "/RECORDS");
+    while ( (read_bytes = split(chunkS, prv, __ReadSize, __ChunkSize, read_bytes)) > 0) {
+        #ifdef DEBUG
+        printf("DEBUG: Generated %u chunks after processing %.2f MB\n", chunkS->nchunks, (float)read_bytes/(1024*1024));
+        #endif
+        parse_prv_records(chunkS, records[0], records[1], records[2]);
+        if (first) {
+            create_datasets(record_group_id, dimms, datasets_id, read_bytes);
+            first = 0;
+        }
+        write_records_to_HDF5(datasets_id, dimms, offsets, records);
+    }
+    /* Freeing data structures */
+    for (size_t i = 0; i < 3; i++) {
+        free(records[i]->array);
+        free(records[i]);
+        status = H5Dclose(datasets_id[i]);
+    }
+    free(chunkS);
     status = H5Fclose(file_id);
-    // hid_t file_id, dataset_id;
-    // file_id = H5Fcreate("test.h5", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-    // H5Fclose(file_id);
-    // for (int i = 0; i < events->rows; i++) {
-    //     for (int j = 0; j < EVENT_RECORD_ELEM; j++) {
-    //         printf("%"PRIu64":", events->array[i][j]);
-    //     }
-    //     printf("\n");
+}
 
-    // }
-
-    return 0;
+void Usage(int argc) {
+    if (argc < 3) {
+        printf("Usage: ./prv_reader prv_file hdf5_name\nThis parser parses prv_file generating the hdf5_name file in HDF5 format. The HDF5 file contains under /RECORDS 3 datasets, one for each record found in the prv file: STATES, EVENTS and COMMUNICATIONS.\n");
+        exit(EXIT_FAILURE);
+    }
+}
+int main(int argc, char **argv) {
+    Usage(argc);
+    get_env();  // Get environment variables
+    parse_prv_to_hdf5(argv[1], argv[2]);
+    return EXIT_SUCCESS;
 }

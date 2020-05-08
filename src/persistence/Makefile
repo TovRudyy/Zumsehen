@@ -1,7 +1,7 @@
 HDF_INSTALL	=	${HDF5_HOME}
 EXTLIB		=	-L$(HDF_INSTALL)/lib
 CC			=	gcc
-CFLAGS		=	-fopenmp -O3
+CFLAGS		=	-fopenmp -O3 -DDEBUG -DPROFILING
 LIB			=	-lz -ldl -lm
 
 INCLUDE	=	-I$(HDF_INSTALL)/include
