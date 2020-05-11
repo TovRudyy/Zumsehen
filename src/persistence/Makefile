@@ -1,13 +1,16 @@
-HDF_INSTALL	=	${HDF5_HOME}
-EXTLIB		=	-L$(HDF_INSTALL)/lib
-CC			=	gcc
-CFLAGS		=	-fopenmp -O3 -march=native -DDEBUG -DPROFILING
-LIB			=	-L$(HDF5_HOME)/lib -lz -ldl -lm -lhdf5
+CC          = gcc
+CFLAGS      = -fopenmp -O3 -march=native -DDEBUG -DPROFILING
+LDLIBS      = -lhdf5
 
-INCLUDE	=	-I$(HDF_INSTALL)/include
+ifneq (${HDF5_HOME},)
+    HDF5_DIR    = $(HDF5_HOME)
+    CFLAGS     += -I$(HDF5_DIR)/include
+    LDFLAGS    += -L$(HDF5_DIR)/lib
+endif
 
-prv_reader: prv_reader.c
-	$(CC) $(CFLAGS) prv_reader.c -o prv_reader $(INCLUDE) $(LIB)
+.PHONY: clean default
+
+default: prv_reader
 
 clean:
-	rm -f prv_reader
+	$(RM) prv_reader
