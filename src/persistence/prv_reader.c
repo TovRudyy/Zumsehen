@@ -20,6 +20,7 @@
 #define MAXBUF  32768
 #define DEF_READ_SIZE   1024*1024*1024
 #define DEF_EXTEND_EVENT_CAPACITY   2
+#define DEF_COMPRESSION_LEVEL   0
 #define AV_LINE_LENGTH_BYTES  32
 #define MIN_BYTES_STATES_LINE   16
 #define MIN_BYTES_EVENTS_LINE   32
@@ -43,6 +44,7 @@ long long __ReadSize = DEF_READ_SIZE;
 long long __MaxHDF5ChunkSize = DEF_MAX_HDF5_CHUNK_SIZE;
 long long __MinHDF5ChunkSize = DEF_MIN_HDF5_CHUNK_SIZE;
 long long __ExtendEventCapacity = DEF_EXTEND_EVENT_CAPACITY;
+int __CompressionLevel = DEF_COMPRESSION_LEVEL;
 
 typedef enum {
     STATE_RECORD    =   1,
@@ -338,7 +340,6 @@ void get_env() {
         ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld elements)\n", DEF_MIN_HDF5_CHUNK_SIZE);
         __MinHDF5ChunkSize = DEF_MIN_HDF5_CHUNK_SIZE;
     }
-    /* ZNSHN_EXTEND_EVENT_CAPACITY worsens performance */
     ret += sprintf(&__debug_buffer[ret], "DEBUG: Env. value ZMSHN_EXTEND_EVENT_CAPACITY:\t");
     if ((env = getenv("ZMSHN_EXTEND_EVENT_CAPACITY")) != NULL) {
          ret += sprintf(&__debug_buffer[ret], "defined (%s factor)\n", env);
@@ -347,6 +348,15 @@ void get_env() {
     else {
         ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld factor)\n", DEF_EXTEND_EVENT_CAPACITY);
         __ExtendEventCapacity = DEF_EXTEND_EVENT_CAPACITY;
+    }
+    ret += sprintf(&__debug_buffer[ret], "DEBUG: Env. value ZMSHN_COMPRESSION_LEVEL:\t");
+    if ((env = getenv("ZMSHN_COMPRESSION_LEVEL")) != NULL) {
+         ret += sprintf(&__debug_buffer[ret], "defined (%s level)\n", env);
+        __CompressionLevel = atoll(env);
+    }
+    else {
+        ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld level)\n", DEF_EXTEND_EVENT_CAPACITY);
+        __CompressionLevel = DEF_EXTEND_EVENT_CAPACITY;
     }
     #ifdef DEBUG
     printf(__debug_buffer);
@@ -387,9 +397,10 @@ void create_datasets(const hid_t file, const hsize_t dimms[3][2], hid_t datasets
     for (size_t i = 0; i < 3; i++) {
         /* HDF5 dataspace creation for STATES, EVENTS and COMMs records */
         hid_t dataspaces = H5Screate_simple(2, dimms[i], max_dimms[i]);
-        /* HDF5 modifies dataset creation properties (enable chunking) */
+        /* HDF5 modifies dataset creation properties (enable chunking & compression) */
         hid_t props = H5Pcreate (H5P_DATASET_CREATE);
         status = H5Pset_chunk(props, 2, chunk_dimms[i]);
+        status = H5Pset_deflate(props, __CompressionLevel);
         /* HDF5 creates 1 dataset for each record */
         switch (i) 
         {
