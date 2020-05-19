@@ -76,7 +76,7 @@ class ParaverReader(Reader):
             except KeyError:
                 f.create_group("RECORDS")
                 records = f["RECORDS"]
-                
+
             records.attrs["name"] = trace_metadata.name
             records.attrs["path"] = trace_metadata.path
             records.attrs["type"] = trace_metadata.type

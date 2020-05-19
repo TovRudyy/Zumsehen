@@ -11,6 +11,10 @@
                 <div>Date: {{ current_trace.metadata.date_time.isoformat() }}</div>
                 <div>Nodes: {{ current_trace.metadata.nodes }}</div>
                 <div>Apps: {{ current_trace.metadata.apps }}</div>
+                <br>
+                <div id="visualizations">
+                    <a class="btn btn-primary" href="{{ url_for('visualize_table') }}" target="_blank">Visualize table</a>
+                </div>
             {% else %}
                 <div>No trace selected.</div>
             {% endif %}

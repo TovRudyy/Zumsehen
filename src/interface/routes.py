@@ -7,6 +7,7 @@ from flask import flash, redirect, render_template, request, url_for
 from src.Trace import Trace
 from src.interface import app
 from src.persistence.controller import parse_trace
+from src.core.controller import get_table_data
 
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -103,3 +104,12 @@ def drop_trace():
         current_trace = None
     del traces[droped_trace_name]
     return redirect(url_for("analyze"))
+
+
+@app.route("/visualize_table")
+def visualize_table():
+    cols_header, table_data, min_value, max_value = get_table_data(current_trace)
+    logger.info(f"min_value {min_value}, max_value {max_value}")
+
+    return render_template("visualization_table.html", cols_header=cols_header,
+                           table_data=table_data, min_value=min_value, max_value=max_value)
