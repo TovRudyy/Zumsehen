@@ -23,6 +23,7 @@ def _check_attribute(attribute):
 
 # this functions compute the bit mask of the DataFrame indices that meet the condition
 
+
 def _filter_equal(df, attribute, value):
     return df[attribute] == value
 

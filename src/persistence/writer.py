@@ -13,8 +13,6 @@ class Writer:
             df = df.compute()
         if df.shape[0] > 0:
             df.to_hdf(index=False, *args, **kwargs)
-        else:
-            pass
 
     def dataframe_to_hdf5(self, file: str, df_state, df_event, df_comm):
         self._write_if_rows(df_state, file, key="States", format="table")
