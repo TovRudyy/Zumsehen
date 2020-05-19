@@ -16,8 +16,8 @@ class TraceMetaData:
     name: str = ""
     path: str = ""
     type: str = ""
-    exec_time: timedelta = None
-    date: datetime = None
+    exec_time: int = None   # microseconds
+    date_time: datetime = None
     # len(Nodes) = #nodes | Nodes[0] = #CPUs of Node 1
     nodes: List[int] = None
     # len(Apps) = #Apps | len(Apps[0]) = #Tasks of APP 1 | App[0][0] = {"nThreads": int, "node": int}

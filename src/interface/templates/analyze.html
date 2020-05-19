@@ -8,7 +8,7 @@
                 <div>Path: {{ current_trace.metadata.path }}.</div>
                 <div>Type: {{ current_trace.metadata.type }}.</div>
                 <div>Execution time: {{ current_trace.metadata.exec_time }}.</div>
-                <div>Date: {{ current_trace.metadata.date.isoformat() }}</div>
+                <div>Date: {{ current_trace.metadata.date_time.isoformat() }}</div>
                 <div>Nodes: {{ current_trace.metadata.nodes }}</div>
                 <div>Apps: {{ current_trace.metadata.apps }}</div>
             {% else %}
