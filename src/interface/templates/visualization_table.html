@@ -46,9 +46,6 @@
               let value = parseFloat($(this).text())
               let minValue = "{{ min_value }}";
               let maxValue = "{{ max_value }}";
-              console.log("minValue " + minValue)
-              console.log("maxValue " + maxValue)
-              console.log("value " + value)
               let h = Math.floor((maxValue - value) * 120 / maxValue);
               let s = Math.abs(value - 50)/50;
               let v = 1;
