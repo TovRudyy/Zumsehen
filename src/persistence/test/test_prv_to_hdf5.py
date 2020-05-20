@@ -1,20 +1,15 @@
 import logging
 from unittest.mock import patch
 
-import pandas as pd
 import pytest
 
 from src.persistence.hdf5_reader import HDF5Reader
 from src.persistence.prv_to_hdf5 import ParaverToHDF5
+from src.persistence.test.common import assert_equals_if_rows, files_dir, get_prv_test_traces
 from src.persistence.writer import Writer
 
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-TRACES_DIR = "src/persistence/test/test_files/traces"
-
-files_dir = "src/persistence/test/test_files/traces"
-files = ["10MB.test.prv"]
 
 format_converter = ParaverToHDF5()
 
@@ -32,24 +27,6 @@ def test_get_event_row():
 def test_get_comm_row():
     # TODO
     pass
-
-
-def get_prv_test_traces():
-    data = []
-    for test in files:
-        parsed_test = f"{files_dir}/{test[:-8]}parsed.hdf"
-        sol_state = pd.read_hdf(parsed_test, key="States").astype("int64")
-        sol_event = pd.read_hdf(parsed_test, key="Events").astype("int64")
-        sol_comm = pd.read_hdf(parsed_test, key="Comm").astype("int64")
-        data.append(
-            {
-                "Input": f"{files_dir}/{test}",
-                "states_records": sol_state,
-                "event_records": sol_event,
-                "comm_records": sol_comm,
-            }
-        )
-    return data
 
 
 all_parser_params = (
@@ -74,11 +51,6 @@ def test_seq_prv_trace_parser(parser_params):
             assert test["states_records"].equals(df_state)
             assert test["event_records"].equals(df_event)
             assert test["comm_records"].equals(df_comm)
-
-
-def assert_equals_if_rows(df1, df2):
-    if df1.shape[0] != 0 and df2.shape[0] != 0:
-        assert df1.equals(df2)
 
 
 @pytest.mark.parametrize("use_dask", (False, True))

@@ -15,8 +15,6 @@ logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# import pyextrae.sequential as pyextrae
-
 STATE_RECORD = "1"
 EVENT_RECORD = "2"
 COMM_RECORD = "3"
@@ -107,7 +105,6 @@ class ParaverToHDF5(FormatConverter):
         return arr_state[0:stcount], stcount, arr_event[0:evcount], evcount, arr_comm[0:commcount], commcount
 
     def seq_parser(self, chunk: List[str]):
-        start_time = time.time()
         # Pre-allocation of arrays
         arr_state = np.zeros(MIN_ELEM, dtype="int64")
         arr_event = np.zeros(MIN_ELEM, dtype="int64")

@@ -6,3 +6,4 @@ dask
 numpy
 xlrd
 tables
+h5py
