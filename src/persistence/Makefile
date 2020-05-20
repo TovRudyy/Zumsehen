@@ -1,6 +1,6 @@
 CC          = gcc
 CFLAGS      = -fopenmp -O3 -march=native -DDEBUG -DPROFILING
-LDLIBS      = -lhdf5
+LDLIBS      = -lhdf5 -lhdf5_hl
 
 ifneq (${HDF5_HOME},)
     HDF5_DIR    = $(HDF5_HOME)
