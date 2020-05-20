@@ -16,6 +16,7 @@
 
 #include <omp.h>
 #include "hdf5.h"
+#include "hdf5_hl.h"
 
 #define MAXBUF  32768
 #define DEF_READ_SIZE   1024*1024*1024
@@ -26,11 +27,15 @@
 #define MIN_BYTES_EVENTS_LINE   32
 #define MIN_BYTES_COMMS_LINE    64
 #define MIN_EVENT_CAP   512
-#define DEF_MAX_HDF5_CHUNK_SIZE 1198372
-#define DEF_MIN_HDF5_CHUNK_SIZE 2048
+#define DEF_MAX_HDF5_CHUNK_SIZE 4194304
+#define DEF_MIN_HDF5_CHUNK_SIZE 4096
 #define STATE_RECORD_ELEM 7
 #define EVENT_RECORD_ELEM 7
 #define COMM_RECORD_ELEM 14
+#define HDF5_GROUP_NAME "/RECORDS"
+#define STATE_DATASET_NAME "/RECORDS/STATES"
+#define EVENT_DATASET_NAME "/RECORDS/EVENTS"
+#define COMM_DATASET_NAME "/RECORDS/COMMUNICATIONS"
 #define MASTER_THREAD 0
 #define TRUE    1
 #define FALSE   0
@@ -53,11 +58,11 @@ typedef enum {
     INVALID_RECORD  =   -1,
 } recordTypes_enum;
 
-typedef struct uint64_Array {
-    uint64_t *array;    // array[]
+typedef struct record_Array {
+    void *array;    // array[]
     size_t elements;
     size_t capacity;
-} uint64_Array;
+} record_Array;
 
 typedef struct file_data {
     char *buffer;
@@ -68,6 +73,55 @@ typedef struct file_data {
     uint16_t *lengths;
     int8_t *types;
 } file_data;
+
+typedef struct state_row {
+    uint32_t cpu_id;
+    uint16_t appl_id;
+    uint32_t task_id;
+    uint32_t thread_id;
+    uint64_t time_ini;
+    uint64_t time_fi;
+    uint16_t state;
+} state_row;
+
+typedef struct event_row {
+    uint32_t cpu_id;
+    uint16_t appl_id;
+    uint32_t task_id;
+    uint32_t thread_id;
+    uint64_t time;
+    uint64_t event_t;
+    uint64_t event_v;
+} event_row;
+
+typedef struct comm_row {
+    uint32_t cpu_send_id;
+    uint32_t ptask_send_id;
+    uint32_t task_send_id;
+    uint32_t thread_send_id;
+    uint64_t lsend;
+    uint64_t psend;
+    uint32_t cpu_recv_id;
+    uint32_t ptask_recv_id;
+    uint32_t task_recv_id;
+    uint32_t thread_recv_id;
+    uint64_t lrecv;
+    uint64_t precv;
+    uint64_t size;
+    uint64_t tag;
+} comm_row;
+
+const char *__State_field_names[STATE_RECORD_ELEM] = {"CPU ID", "APP ID", "Task ID", "Thread ID", "Time ini", "Time fi", "State"};
+hid_t __State_field_type[STATE_RECORD_ELEM];
+size_t __State_offset[STATE_RECORD_ELEM];
+
+const char *__Event_field_names[EVENT_RECORD_ELEM] = {"CPU ID", "APP ID", "Task ID", "Thread ID", "Time", "Event Type", "Event Value"};
+size_t __Event_offset[EVENT_RECORD_ELEM];
+hid_t __Event_field_type[EVENT_RECORD_ELEM];
+
+const char *__Comm_field_names[COMM_RECORD_ELEM] = {"CPU Send ID", "Phy. Task Send ID", "Log. Task Send ID", "Thread Send ID", "Log. Send Time", "Phy. Send Time", "CPU Receive ID", "Phy. Task Receive ID", "Log. Task Receive ID", "Thread Receive ID", "Log. Receive Time", "Phy. Receive Time", "Size", "Tag"};
+hid_t __Comm_field_type[COMM_RECORD_ELEM];
+size_t __Comm_offset[EVENT_RECORD_ELEM];
 
 recordTypes_enum get_record_type(char *line) {
     char record = line[0];
@@ -95,71 +149,113 @@ size_t align_to_line(FILE *fp, const size_t read_bytes, const char* buf) {
     return back;
 }
 
-size_t parse_state(char *line, uint64_t *state) {
+size_t parse_state(char *line, state_row *state) {
     char *next, *rest = line;
-    size_t i = 0;
-    // Discards the record type:
+    size_t ret = 7;
+    // Discards the record type
     strtok_r(rest, ":", &rest);
-    while ((next = strtok_r(rest, ":", &rest))) {
-        state[i] = (uint64_t) atoll(next);
-        i++;
-    }
-    return i;
+    next = strtok_r(rest, ":", &rest);
+    state->cpu_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    state->appl_id = (uint16_t) atoi(next);
+    next = strtok_r(rest, ":", &rest);
+    state->task_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    state->thread_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    state->time_ini = (uint64_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    state->time_fi = (uint64_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    state->state = (uint16_t) atoi(next);
+    return ret;
 }
 
-/* Not constant amount of events in each line. Thus, this routine returns a pointer with *nevents rows */
-size_t parse_event(char *line, uint64_t **events) {
+/* Fills the event rows of events with the events of the events found */
+size_t parse_event(char *line, event_row *events) {
     char *next, *nnext, *rest = line;
     size_t nevents = 0;
-    uint64_t *event = (uint64_t *)calloc(EVENT_RECORD_ELEM, sizeof(uint64_t));
     //We discard the record type:
     strtok_r(rest, ":", &rest);
-    for (size_t i = 0; i < EVENT_RECORD_ELEM; i++) {
-        next = strtok_r(rest, ":", &rest);
-        event[i] = (uint64_t) atoll(next);
-    }
-    events[nevents] = event;
+    next = strtok_r(rest, ":", &rest);
+    events[nevents].cpu_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    events[nevents].appl_id = (uint16_t) atoi(next);
+    next = strtok_r(rest, ":", &rest);
+    events[nevents].task_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    events[nevents].thread_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    events[nevents].time = (uint64_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    events[nevents].event_t = (uint64_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    events[nevents].event_v = (uint64_t) atoll(next);
     nevents++;
     while ((next = strtok_r(rest, ":", &rest)) && (nnext = strtok_r(rest, ":", &rest))) {
-        event = (uint64_t *)calloc(EVENT_RECORD_ELEM, sizeof(uint64_t));
-        for (size_t __i = 0; __i < 5; __i++)
-            event[__i] = events[nevents-1][__i];
-        event[EVENT_RECORD_ELEM-2] = (uint64_t) atoll(next);
-        event[EVENT_RECORD_ELEM-1] = (uint64_t) atoll(nnext);
-        events[nevents] = event;
+        events[nevents].cpu_id = events[nevents-1].cpu_id;
+        events[nevents].appl_id = events[nevents-1].appl_id;
+        events[nevents].task_id = events[nevents-1].task_id;
+        events[nevents].thread_id = events[nevents-1].thread_id;
+        events[nevents].time = events[nevents-1].time;
+        events[nevents].event_t = (uint64_t) atoll(next);
+        events[nevents].event_v = (uint64_t) atoll(nnext);
         nevents++;
     }
     return nevents;
 }
 
-size_t parse_comm(char *line, uint64_t *comm) {
+size_t parse_comm(char *line, comm_row *comm) {
     char *next, *rest = line;
-    size_t i = 0;
+    size_t res = 14;
     //We discard the record type:
     strtok_r(rest, ":", &rest);
-    while ((next = strtok_r(rest, ":", &rest))) {
-        comm[i] = (uint64_t) atoll(next);
-        i++;
-    }
-    return i;
+    next = strtok_r(rest, ":", &rest);
+    comm->cpu_send_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->ptask_send_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->task_send_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->thread_send_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->lsend = (uint64_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->psend = (uint64_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->cpu_recv_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->ptask_recv_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->task_recv_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->thread_recv_id = (uint32_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->lrecv = (uint64_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->precv = (uint64_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->size = (uint64_t) atoll(next);
+    next = strtok_r(rest, ":", &rest);
+    comm->tag = (uint64_t) atoll(next);
+    return res;
 }
 
-/* Takes the read data from the .prv file and fills the states, events and comms arrays */
-void data_parser(const file_data *file_d, uint64_Array *states, uint64_Array *events, uint64_Array *comms) {
+/* Takes the read data from the .prv file and fills the states, events and comms row structures */
+void data_parser(const file_data *file_d, record_Array *states, record_Array *events, record_Array *comms) {
     #ifdef PROFILING
     struct timeval start, end;
     REGISTER_TIME(&start);
     #endif
     size_t ret;
     size_t st_cap, ev_cap, cmm_cap;
+    st_cap = (states->capacity) = (file_d->counter_states);
+    ev_cap = (events->capacity) = (file_d->counter_events)+MIN_EVENT_CAP;
+    cmm_cap = (comms->capacity) = (file_d->counter_comms);
     size_t st_elem, ev_elem, cmm_elem;
-    uint64_t *states_a, *events_a, *comms_a;
-    st_cap = (states->capacity) = (file_d->counter_states)*STATE_RECORD_ELEM;
-    states_a = (states->array) = (uint64_t *)malloc((states->capacity)*sizeof(uint64_t));
-    ev_cap = (events->capacity) = (file_d->counter_events)*EVENT_RECORD_ELEM+MIN_EVENT_CAP;
-    events_a = (events->array) = (uint64_t *)malloc((events->capacity)*sizeof(uint64_t));
-    cmm_cap = (comms->capacity) = (file_d->counter_comms)*COMM_RECORD_ELEM;
-    comms_a = (comms->array) = (uint64_t *)malloc((comms->capacity)*sizeof(uint64_t));
+    state_row *states_a = states->array = (state_row *)calloc((states->capacity), sizeof(state_row));
+    event_row *events_a = events->array = (event_row *)calloc((events->capacity), sizeof(event_row));
+    comm_row  *comms_a = comms->array = (comm_row *)calloc((comms->capacity), sizeof(comm_row));
     st_elem = ev_elem = cmm_elem = (states->elements) = (events->elements) = (comms->elements) = 0;
     char * buffer= (file_d->buffer);
     uint16_t *lengths = (file_d->lengths);
@@ -169,49 +265,39 @@ void data_parser(const file_data *file_d, uint64_Array *states, uint64_Array *ev
     size_t offset;
     iterator = offset = 0;
     total_lines = (file_d->counter_states) + (file_d->counter_events) + (file_d->counter_comms) + (file_d->counter_unknowns);
-    uint64_t aux_buf[512];
-    uint64_t **aux_events = (uint64_t **)malloc(128*sizeof(uint64_t *));
     while(iterator < total_lines) {
         switch(types[iterator]) {
             case STATE_RECORD   :
-            ret = parse_state(&buffer[offset], aux_buf);
+            ret = parse_state(&buffer[offset], &states_a[st_elem]);
             assert(ret == STATE_RECORD_ELEM);
-            for (size_t __i = 0; __i < ret; __i++)
-                states_a[st_elem*STATE_RECORD_ELEM+__i] = aux_buf[__i];
             st_elem++;
             break;
 
             case EVENT_RECORD   :
-            ret = parse_event(&buffer[offset], aux_events);
-            for (size_t __i = 0; __i < ret; __i++, ev_elem++) {
-                for (size_t __j = 0; __j < EVENT_RECORD_ELEM; __j++)
-                    events_a[ev_elem*EVENT_RECORD_ELEM+__j] = aux_events[__i][__j];
-                free(aux_events[__i]);
-            }
-            if ((ev_elem*EVENT_RECORD_ELEM + EVENT_RECORD_ELEM*64) >= ev_cap) {   // Checks if capacity of events buffer is enough to hold more rows
+            ret = parse_event(&buffer[offset], &events_a[ev_elem]);
+            ev_elem += ret;
+            if ((ev_elem+MIN_EVENT_CAP) >= ev_cap) {   // Checks if capacity of events buffer is enough to hold more rows
                 ev_cap = ev_cap*__ExtendEventCapacity;
                 (events->capacity) = ev_cap;
-                uint64_t *replacement = (uint64_t *)malloc(ev_cap*sizeof(uint64_t));
-                memcpy(replacement, (events->array), ev_elem*EVENT_RECORD_ELEM*sizeof(uint64_t));
+                event_row *replacement = (event_row *)calloc(ev_cap, sizeof(event_row));
+                memcpy(replacement, (events->array), ev_elem*sizeof(event_row));
                 free(events->array);
                 events_a = (events->array) = replacement;
             }
             break;
 
             case COMM_RECORD    :
-            ret = parse_comm(&buffer[offset], aux_buf);
+            ret = parse_comm(&buffer[offset], &comms_a[cmm_elem]);
             assert(ret == COMM_RECORD_ELEM);
-            for (size_t __i = 0; __i < ret; __i++)
-                comms_a[cmm_elem*STATE_RECORD_ELEM+__i] = aux_buf[__i];
             cmm_elem++;
             break;
+
             default:
             break;
         }
         offset += lengths[iterator];
         iterator++;
     }
-    free(aux_events);
     (states->elements) = st_elem;
     (events->elements) = ev_elem;
     (comms->elements) = cmm_elem;
@@ -328,7 +414,7 @@ void get_env() {
         __MaxHDF5ChunkSize = atoll(env);
     }
     else {
-        ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld elements)\n", DEF_MAX_HDF5_CHUNK_SIZE);
+        ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld rows)\n", DEF_MAX_HDF5_CHUNK_SIZE);
         __MaxHDF5ChunkSize = DEF_MAX_HDF5_CHUNK_SIZE;
     }
     ret += sprintf(&__debug_buffer[ret], "DEBUG: Env. value ZMSHN_MIN_HDF5_CHUNK_SIZE:\t");
@@ -337,7 +423,7 @@ void get_env() {
         __MinHDF5ChunkSize = atoll(env);
     }
     else {
-        ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld elements)\n", DEF_MIN_HDF5_CHUNK_SIZE);
+        ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld rows)\n", DEF_MIN_HDF5_CHUNK_SIZE);
         __MinHDF5ChunkSize = DEF_MIN_HDF5_CHUNK_SIZE;
     }
     ret += sprintf(&__debug_buffer[ret], "DEBUG: Env. value ZMSHN_EXTEND_EVENT_CAPACITY:\t");
@@ -355,8 +441,8 @@ void get_env() {
         __CompressionLevel = atoll(env);
     }
     else {
-        ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld level)\n", DEF_EXTEND_EVENT_CAPACITY);
-        __CompressionLevel = DEF_EXTEND_EVENT_CAPACITY;
+        ret += sprintf(&__debug_buffer[ret], "not defined (default value %lld level)\n", DEF_COMPRESSION_LEVEL);
+        __CompressionLevel = DEF_COMPRESSION_LEVEL;
     }
     #ifdef DEBUG
     printf(__debug_buffer);
@@ -376,85 +462,77 @@ hid_t create_HDF5_group(const hid_t parent, const char * name) {
     return group_id;
 }
 
-/* Returns one dataset for STATES, EVENTS and COMM respectively */
-void create_datasets(const hid_t file, const hsize_t dimms[3][2], hid_t datasets[3], const size_t rows[3]) {
-    size_t chunk_state, chunk_event, chunk_comm;
-    if (rows[0] > __MinHDF5ChunkSize && rows[0] < __MaxHDF5ChunkSize)
-        chunk_state = rows[0];
-    else if (rows[0] > __MaxHDF5ChunkSize) chunk_state = __MaxHDF5ChunkSize;
-    else chunk_state = __MinHDF5ChunkSize;
-    if (rows[1] > __MinHDF5ChunkSize && rows[1] < __MaxHDF5ChunkSize)
-        chunk_event = rows[1];
-    else if (rows[1] > __MaxHDF5ChunkSize) chunk_event = __MaxHDF5ChunkSize;
-    else chunk_event = __MinHDF5ChunkSize;
-    if (rows[2] > __MinHDF5ChunkSize && rows[2] < __MaxHDF5ChunkSize)
-        chunk_comm = rows[2];
-    else if (rows[2] > __MaxHDF5ChunkSize) chunk_comm = __MaxHDF5ChunkSize;
-    else chunk_comm = __MinHDF5ChunkSize;
-
-    hsize_t chunk_dimms[3][2] = {chunk_state, STATE_RECORD_ELEM, chunk_event, EVENT_RECORD_ELEM, chunk_comm, COMM_RECORD_ELEM};
-    hsize_t max_dimms[3][2] = {H5S_UNLIMITED, STATE_RECORD_ELEM, H5S_UNLIMITED, EVENT_RECORD_ELEM, H5S_UNLIMITED, COMM_RECORD_ELEM};   
-    for (size_t i = 0; i < 3; i++) {
-        /* HDF5 dataspace creation for STATES, EVENTS and COMMs records */
-        hid_t dataspaces = H5Screate_simple(2, dimms[i], max_dimms[i]);
-        /* HDF5 modifies dataset creation properties (enable chunking & compression) */
-        hid_t props = H5Pcreate (H5P_DATASET_CREATE);
-        status = H5Pset_chunk(props, 2, chunk_dimms[i]);
-        status = H5Pset_deflate(props, __CompressionLevel);
-        /* HDF5 creates 1 dataset for each record */
-        switch (i) 
-        {
-            case 0: // STATE
-                datasets[i] = H5Dcreate2 (file, "STATES", H5T_NATIVE_ULLONG, dataspaces, H5P_DEFAULT, props, H5P_DEFAULT);
-                break;
-            case 1: // EVENT
-                datasets[i] = H5Dcreate2 (file, "EVENTS", H5T_NATIVE_ULLONG, dataspaces, H5P_DEFAULT, props, H5P_DEFAULT);
-                break;
-            case 2: // COMM
-                datasets[i] = H5Dcreate2 (file, "COMMUNICATIONS", H5T_NATIVE_ULLONG, dataspaces, H5P_DEFAULT, props, H5P_DEFAULT);
-            default:
-                break;
-        }
-        status = H5Sclose(dataspaces);
-        status = H5Pclose(props);
-    }
-}
-
-void write_records_to_HDF5(const hid_t datasets[3], hsize_t dimms[3][2], hsize_t offsets[3][2],  uint64_Array *records) {
+void create_HDF5tables(const hid_t loc_id, record_Array state, record_Array event, record_Array comm) {
     #ifdef PROFILING
     struct timeval start, end;
     REGISTER_TIME(&start);
     #endif
-    /* HDF5 extends dataset dimensions */
-    hid_t filespace, memspace;
-    for (size_t i = 0; i < 3; i++) {
-        dimms[i][0] += records[i].elements;    // Updates dimensions
-        status = H5Dset_extent(datasets[i], dimms[i]);   // Extends dataset's dimensions
-        filespace = H5Dget_space(datasets[i]);   // Refreshes dataset data
-        hsize_t dimext[2];
-        switch (i) {
-        case 0: // STATE
-            dimext[0] = records[i].elements; dimext[1] = STATE_RECORD_ELEM;
-            break;
-        case 1: // EVENT
-            dimext[0] = records[i].elements; dimext[1] = EVENT_RECORD_ELEM;
-            break;
-        case 2: // COMM
-            dimext[0] = records[i].elements; dimext[1] = COMM_RECORD_ELEM;
-        default:
-            break;
-        }
-        status = H5Sselect_hyperslab (filespace, H5S_SELECT_SET, offsets[i], NULL, dimext, NULL);    // Define where to add the new data in the dataset
-        memspace = H5Screate_simple (2, dimext, NULL);  // Allocate memory for new data
-        status = H5Dwrite (datasets[i], H5T_NATIVE_ULLONG, memspace, filespace, H5P_DEFAULT, records[i].array);    // Append new data to the dataset
-        /* Free innecesarry data structures */
-        status = H5Sclose (memspace);
-        status = H5Sclose (filespace);
-        offsets[i][0] += records[i].elements;  // Update the offsets
-    }
+    size_t chunk_state, chunk_event, chunk_comm;
+    if (state.elements > __MaxHDF5ChunkSize) chunk_state = __MaxHDF5ChunkSize;
+    else if (state.elements < __MinHDF5ChunkSize) chunk_state = __MinHDF5ChunkSize;
+    else chunk_state = state.elements;
+
+    if (event.elements > __MaxHDF5ChunkSize) chunk_event = __MaxHDF5ChunkSize;
+    else if (event.elements < __MinHDF5ChunkSize) chunk_event = __MinHDF5ChunkSize;
+    else chunk_event = event.elements;
+
+    if (comm.elements > __MaxHDF5ChunkSize/2) chunk_comm = __MaxHDF5ChunkSize/2;
+    else if (comm.elements < __MinHDF5ChunkSize/2) chunk_comm = __MinHDF5ChunkSize/2;
+    else chunk_comm = comm.elements;
+
+    H5TBmake_table("State records", loc_id, STATE_DATASET_NAME, STATE_RECORD_ELEM, state.elements, sizeof(state_row), __State_field_names, __State_offset, __State_field_type, chunk_state, NULL, __CompressionLevel, (state_row *) state.array);
+    H5TBmake_table("Event records", loc_id, EVENT_DATASET_NAME, EVENT_RECORD_ELEM, event.elements, sizeof(event_row), __Event_field_names, __Event_offset, __Event_field_type, chunk_event, NULL, __CompressionLevel, (event_row *) event.array);
+
+    H5TBmake_table("Communication records", loc_id, COMM_DATASET_NAME, COMM_RECORD_ELEM, comm.elements, sizeof(comm_row), __Comm_field_names, __Comm_offset, __Comm_field_type, chunk_comm, NULL, __CompressionLevel, (comm_row *) comm.array);
     #ifdef PROFILING
     REGISTER_TIME(&end);
-    printf("Elapsed time writing 1 block:    %.3f sec\n", GET_ELAPSED_TIME(start, end));
+    printf("Elapsed time create HDF5T, 1st block:    %.3f sec\n", GET_ELAPSED_TIME(start, end));
+    #endif
+}
+
+void extend_HDF5tables(const hid_t loc_id, record_Array state, record_Array event, record_Array comm) {
+    #ifdef PROFILING
+    struct timeval start, end;
+    REGISTER_TIME(&start);
+    #endif
+    state_row state_sample; 
+    event_row ev_sample;
+    comm_row comm_sample;
+    size_t state_field_size[STATE_RECORD_ELEM] = {sizeof(state_sample.cpu_id), 
+                                                  sizeof(state_sample.appl_id), 
+                                                  sizeof(state_sample.task_id), 
+                                                  sizeof(state_sample.thread_id), 
+                                                  sizeof(state_sample.time_ini), 
+                                                  sizeof(state_sample.time_fi), 
+                                                  sizeof(state_sample.state)};
+    size_t event_field_size[EVENT_RECORD_ELEM] = {sizeof(ev_sample.cpu_id), 
+                                                  sizeof(ev_sample.appl_id), 
+                                                  sizeof(ev_sample.task_id), 
+                                                  sizeof(ev_sample.thread_id), 
+                                                  sizeof(ev_sample.time), 
+                                                  sizeof(ev_sample.event_t), 
+                                                  sizeof(ev_sample.event_v)};
+    size_t comm_field_size[COMM_RECORD_ELEM] = {sizeof(comm_sample.cpu_send_id), 
+                                                sizeof(comm_sample.ptask_send_id), 
+                                                sizeof(comm_sample.task_send_id), 
+                                                sizeof(comm_sample.thread_send_id), sizeof(comm_sample.lsend), 
+                                                sizeof(comm_sample.psend), 
+                                                sizeof(comm_sample.cpu_recv_id), 
+                                                sizeof(comm_sample.ptask_recv_id), 
+                                                sizeof(comm_sample.task_recv_id), 
+                                                sizeof(comm_sample.thread_recv_id), sizeof(comm_sample.lrecv), 
+                                                sizeof(comm_sample.precv), 
+                                                sizeof(comm_sample.size), 
+                                                sizeof(comm_sample.tag)};
+
+    H5TBappend_records(loc_id, STATE_DATASET_NAME, state.elements, sizeof(state_row), __State_offset, state_field_size, (state_row *) state.array);
+
+    H5TBappend_records(loc_id, EVENT_DATASET_NAME, event.elements, sizeof(event_row), __Event_offset, event_field_size, (event_row *) event.array);
+
+    H5TBappend_records(loc_id, COMM_DATASET_NAME, comm.elements, sizeof(comm_row), __Comm_offset, comm_field_size, (comm_row *) comm.array);
+    #ifdef PROFILING
+    REGISTER_TIME(&end);
+    printf("Elapsed time extend HDF5T by 1 block:    %.3f sec\n", GET_ELAPSED_TIME(start, end));
     #endif
 }
 
@@ -462,13 +540,11 @@ void parse_prv_to_hdf5(const char * prv, const char * hdf5) {
     size_t read_bytes, ret;
     read_bytes = ret = 0;
     file_data file_d;
-    uint64_Array records[3];
-    hid_t file_id, record_group_id, datasets_id[3];
-    hsize_t dimms[3][2] = {0, STATE_RECORD_ELEM, 0, EVENT_RECORD_ELEM, 0, COMM_RECORD_ELEM};
-    hsize_t offsets[3][2] = {0, 0, 0, 0, 0, 0}; // Offsets to use later when extending HDF5 datasets
+    record_Array records[3];
+    hid_t file_id, record_group_id;
     int8_t first = TRUE;  // Bool
     file_id = create_HDF5(hdf5);
-    record_group_id = create_HDF5_group(file_id, "/RECORDS");
+    record_group_id = create_HDF5_group(file_id, HDF5_GROUP_NAME);
     while ( (ret = read_and_preprocess(prv, __ReadSize, read_bytes, &file_d)) > 0) {
         #ifdef DEBUG
         printf("DEBUG: read %.2f MB\n", (float)ret/(1024*1024));
@@ -480,25 +556,81 @@ void parse_prv_to_hdf5(const char * prv, const char * hdf5) {
         free(file_d.lengths);
         free(file_d.types);
         if (first) {
-            size_t rows[3] = {records[0].elements, records[1].elements, records[2].elements};
-            create_datasets(record_group_id, dimms, datasets_id, rows);
+            create_HDF5tables(record_group_id, records[0], records[1], records[2]);
             first = FALSE;
         }
-        write_records_to_HDF5(datasets_id, dimms, offsets, records);
+        else extend_HDF5tables(record_group_id, records[0], records[1], records[2]);
         for (size_t i = 0; i < 3; i++) {
             free(records[i].array);
         }
     }
     /* Frees HDF5 data structures */
-    for (size_t i = 0; i < 3; i++) {
-        status = H5Dclose(datasets_id[i]);
-    }
     status = H5Fclose(file_id);
     #ifdef DEBUG
     printf("DEBUG: Total read %.2f MB\n", (float)read_bytes/(1024*1024));
     #endif
 }
 
+void init() {
+    __State_field_type[0] = H5T_NATIVE_UINT; 
+    __State_field_type[1] = H5T_NATIVE_USHORT; 
+    __State_field_type[2] = H5T_NATIVE_UINT; 
+    __State_field_type[3] = H5T_NATIVE_UINT; 
+    __State_field_type[4] =  H5T_NATIVE_ULLONG; 
+    __State_field_type[5] = H5T_NATIVE_ULLONG; 
+    __State_field_type[6] = H5T_NATIVE_USHORT;
+    __State_offset[0] = HOFFSET( state_row, cpu_id ); 
+    __State_offset[1] = HOFFSET( state_row, appl_id ); 
+    __State_offset[2] = HOFFSET( state_row, task_id ); 
+    __State_offset[3] = HOFFSET( state_row, thread_id ); 
+    __State_offset[4] = HOFFSET( state_row, time_ini ); 
+    __State_offset[5] = HOFFSET( state_row, time_fi ); 
+    __State_offset[6] = HOFFSET( state_row, state );
+
+    __Event_field_type[0] = H5T_NATIVE_UINT; 
+    __Event_field_type[1] = H5T_NATIVE_USHORT; 
+    __Event_field_type[2] = H5T_NATIVE_UINT; 
+    __Event_field_type[3] = H5T_NATIVE_UINT; 
+    __Event_field_type[4] = H5T_NATIVE_ULLONG; 
+    __Event_field_type[5] =  H5T_NATIVE_ULLONG; 
+    __Event_field_type[6] = H5T_NATIVE_ULLONG;
+    __Event_offset[0] = HOFFSET( event_row, cpu_id ); 
+    __Event_offset[1] = HOFFSET( event_row, appl_id ); 
+    __Event_offset[2] = HOFFSET( event_row, task_id ); 
+    __Event_offset[3] = HOFFSET( event_row, thread_id ); 
+    __Event_offset[4] = HOFFSET( event_row, time ); 
+    __Event_offset[5] = HOFFSET( event_row, event_t ); 
+    __Event_offset[6] = HOFFSET( event_row, event_v );
+
+    __Comm_field_type[0] = H5T_NATIVE_UINT; 
+    __Comm_field_type[1] = H5T_NATIVE_UINT; 
+    __Comm_field_type[2] = H5T_NATIVE_UINT; 
+    __Comm_field_type[3] = H5T_NATIVE_UINT; 
+    __Comm_field_type[4] = H5T_NATIVE_ULLONG; 
+    __Comm_field_type[5] = H5T_NATIVE_ULLONG; 
+    __Comm_field_type[6] = H5T_NATIVE_UINT; 
+    __Comm_field_type[7] = H5T_NATIVE_UINT; 
+    __Comm_field_type[8] = H5T_NATIVE_UINT; 
+    __Comm_field_type[9] = H5T_NATIVE_UINT; 
+    __Comm_field_type[10] = H5T_NATIVE_ULLONG; 
+    __Comm_field_type[11] = H5T_NATIVE_ULLONG; 
+    __Comm_field_type[12] = H5T_NATIVE_ULLONG; 
+    __Comm_field_type[13] = H5T_NATIVE_ULLONG;
+    __Comm_offset[0] = HOFFSET( comm_row, cpu_send_id );
+    __Comm_offset[1] = HOFFSET( comm_row, ptask_send_id );
+    __Comm_offset[2] = HOFFSET( comm_row, task_send_id );
+    __Comm_offset[3] = HOFFSET( comm_row, thread_send_id );
+    __Comm_offset[4] = HOFFSET( comm_row, lsend );
+    __Comm_offset[5] = HOFFSET( comm_row, psend );
+    __Comm_offset[6] = HOFFSET( comm_row, cpu_recv_id );
+    __Comm_offset[7] = HOFFSET( comm_row, ptask_recv_id );
+    __Comm_offset[8] = HOFFSET( comm_row, task_recv_id );
+    __Comm_offset[9] = HOFFSET( comm_row, thread_recv_id );
+    __Comm_offset[10] = HOFFSET( comm_row, lrecv );
+    __Comm_offset[11] = HOFFSET( comm_row, precv );
+    __Comm_offset[12] = HOFFSET( comm_row, size );
+    __Comm_offset[13] = HOFFSET( comm_row, tag );
+}
 void Usage(int argc) {
     if (argc < 3) {
         printf("Usage: ./prv_reader prv_file hdf5_name\nThis parser parses prv_file generating the hdf5_name file in HDF5 format. The HDF5 file contains under /RECORDS 3 datasets, one for each record found in the prv file: STATES, EVENTS and COMMUNICATIONS.\n");
@@ -508,6 +640,7 @@ void Usage(int argc) {
 
 int main(int argc, char **argv) {
     Usage(argc);
+    init();
     get_env();  // Get environment variables
     parse_prv_to_hdf5(argv[1], argv[2]);
     return EXIT_SUCCESS;
