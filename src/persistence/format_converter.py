@@ -1,6 +1,8 @@
 import itertools
 from abc import ABC, abstractmethod
 
+# TODO delete class because this will be done in C
+
 
 def isplit(iterable, part_size, group=list):
     """ Yields groups of length `part_size` of items found in iterator.
@@ -16,11 +18,11 @@ def isplit(iterable, part_size, group=list):
 
 
 def chunk_reader(filename: str, read_bytes: int):
-    with open(filename, "r") as f:
+    with open(filename, "r") as file:
         # Discard the header
-        f.readline()
+        file.readline()
         while True:
-            chunk = f.readlines(read_bytes)
+            chunk = file.readlines(read_bytes)
             if not chunk:
                 break
             yield chunk

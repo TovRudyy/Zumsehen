@@ -1,0 +1,27 @@
+body {
+    padding: 2% 3% 2% 3%;
+    min-height: 100%;
+}
+
+#analyze_page {
+    height: 100%;
+}
+#maincontent {
+    float: left;
+    width: 70%;
+    height: 100%;
+}
+#rightmenu{
+    float: right;
+    width: 30%;
+    height: 100%;
+    margin-left: -200px;
+    background-color: #CCCCCC;
+}
+#rightmenuelements{
+    margin-left: 5%;
+    margin-right: 5%;
+}
+.flashes {
+    color: red;
+}

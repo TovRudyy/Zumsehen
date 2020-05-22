@@ -6,4 +6,6 @@ dask
 numpy
 xlrd
 tables
+flask
+werkzeug
 h5py

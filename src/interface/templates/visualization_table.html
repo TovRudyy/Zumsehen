@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Zumsehen</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.css') }}">
+    <script type="text/javascript" src="{{ url_for('static', filename='js/jquery-3.5.1.min.js') }}"></script>
+    <script type="text/javascript">
+      let hsv2rgb = function(h, s, v) {
+        // adapted from http://schinckel.net/2012/01/10/hsv-to-rgb-in-javascript/
+        let rgb, i, data = [];
+        if (s === 0) {
+          rgb = [v,v,v];
+        } else {
+          h = h / 60;
+          i = Math.floor(h);
+          data = [v*(1-s), v*(1-s*(h-i)), v*(1-s*(1-(h-i)))];
+          switch(i) {
+            case 0:
+              rgb = [v, data[2], data[0]];
+              break;
+            case 1:
+              rgb = [data[1], v, data[0]];
+              break;
+            case 2:
+              rgb = [data[0], v, data[2]];
+              break;
+            case 3:
+              rgb = [data[0], data[1], v];
+              break;
+            case 4:
+              rgb = [data[2], data[0], v];
+              break;
+            default:
+              rgb = [v, data[0], data[1]];
+              break;
+          }
+        }
+        return '#' + rgb.map(function(x){
+          return ("0" + Math.round(x*255).toString(16)).slice(-2);
+        }).join('');
+      };
+
+      $(document).ready(function(){
+          $('#table_id td').each(function(){
+              let value = parseFloat($(this).text())
+              let minValue = "{{ min_value }}";
+              let maxValue = "{{ max_value }}";
+              let h = Math.floor((maxValue - value) * 120 / maxValue);
+              let s = Math.abs(value - 50)/50;
+              let v = 1;
+              $(this).css('background-color', hsv2rgb(h, s, 1));
+          });
+      });
+    </script>
+  </head>
+  <body>
+    <table id="table_id" class="table table-bordered text-center">
+      <thead>
+        <tr>
+          <th scope="col"> # </th>
+          {% for col_header in cols_header %}
+            <th scope="col"> {{ col_header }} </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in table_data %}
+          <tr>
+            <th scope="row"> {{ row[0] }} </th>
+            {% for row_values in row[1:] %}
+              <td> {{ row_values }} </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

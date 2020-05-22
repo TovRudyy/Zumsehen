@@ -18,6 +18,9 @@ format:
 	flake8 ${CORE_DIR} ${PERSISTENCE_DIR}
 
 test:
-	pytest -svv ${TEST_DIRS} $(ARGS)
+	pytest -svvv ${TEST_DIRS} $(ARGS)
 
-.PHONY: compile install format test
+start-interface:
+	bash scripts/start_interface.sh
+
+.PHONY: compile install format test start-interface
