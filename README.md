@@ -1,16 +1,8 @@
 # Zumsehen (Paraver in Deutsch)
 Tool for traces analysis.
 
-## Install dependencies
-
-Linux based:
-```bash
-sudo apt-get install libomp-dev
-# TODO add hdf5 linux dependency
-```
-
-MacOS:
-```bash
-brew install libomp
-brew install hdf5
-```
+## Dependencies
+### Python: 
+black flake8 pytest pandas dask numpy xlrd tables flask werkzeug
+### C:
+HDF5 (preferably 1.12.0): https://www.hdfgroup.org/downloads/hdf5/
