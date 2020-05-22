@@ -2,9 +2,7 @@ import logging
 
 from src.persistence.hdf5_reader import HDF5Reader
 from src.persistence.prv_reader import ParaverReader
-from src.persistence.prv_to_hdf5 import ParaverToHDF5
-from src.Trace import Trace, TraceMetaData
-
+from src.Trace import Trace
 
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)

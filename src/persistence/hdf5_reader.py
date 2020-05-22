@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 
 from src.Trace import TraceMetaData
-from src.persistence.reader import Reader
 
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,19 +26,7 @@ def _try_read_hdf(file, key, use_dask):
             return pd.DataFrame([])
 
 
-class HDF5Reader(Reader):
-    def header_time(self, header):
-        pass
-
-    def header_nodes(self, header):
-        pass
-
-    def header_apps(self, header):
-        pass
-
-    def header_parser(self, header):
-        pass
-
+class HDF5Reader:
     def parse_metadata(self, file: str):
         with h5py.File(file, "r") as f:
             records = f["RECORDS"]
@@ -51,7 +38,7 @@ class HDF5Reader(Reader):
                 records.attrs["exec_time"],
                 datetime.fromtimestamp(records.attrs["date_time"]),
                 records.attrs["nodes"],
-                json.loads(str(records.attrs["apps"]))
+                json.loads(str(records.attrs["apps"])),
             )
         return trace_metadata
 
@@ -61,6 +48,3 @@ class HDF5Reader(Reader):
         df_comm_tmp = _try_read_hdf(file, key="Comm", use_dask=use_dask)
         trace_metadata = self.parse_metadata(file)
         return trace_metadata, df_state_tmp, df_event_tmp, df_comm_tmp
-
-    def header_date(self, header):
-        pass

@@ -1,6 +1,8 @@
 import itertools
 from abc import ABC, abstractmethod
 
+# TODO delete class because this will be done in C
+
 
 def isplit(iterable, part_size, group=list):
     """ Yields groups of length `part_size` of items found in iterator.

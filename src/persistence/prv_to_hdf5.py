@@ -8,12 +8,14 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 
-from src.CONST import StateRecord, EventRecord, CommRecord
+from src.CONST import CommRecord, EventRecord, StateRecord
 from src.persistence.format_converter import FormatConverter, chunk_reader, isplit
 
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+# TODO delete class because this will be done in C
 
 STATE_RECORD = "1"
 EVENT_RECORD = "2"
@@ -105,7 +107,6 @@ class ParaverToHDF5(FormatConverter):
         return arr_state[0:stcount], stcount, arr_event[0:evcount], evcount, arr_comm[0:commcount], commcount
 
     def seq_parser(self, chunk: List[str]):
-        start_time = time.time()
         # Pre-allocation of arrays
         arr_state = np.zeros(MIN_ELEM, dtype="int64")
         arr_event = np.zeros(MIN_ELEM, dtype="int64")

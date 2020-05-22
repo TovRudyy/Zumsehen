@@ -1,9 +1,9 @@
 import logging
 from typing import Iterable
 
-from src.CONST import Record
-
 import dask.dataframe as dd
+
+from src.CONST import Record
 
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)

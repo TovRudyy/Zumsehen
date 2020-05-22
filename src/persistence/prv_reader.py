@@ -1,16 +1,14 @@
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Tuple
 
+import dask.dataframe as dd
 import h5py
 
-import dask.dataframe as dd
-
-from src.Trace import TraceMetaData
 from src.persistence.prv_to_hdf5 import ParaverToHDF5
-from src.persistence.reader import Reader
 from src.persistence.writer import Writer
+from src.Trace import TraceMetaData
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -19,7 +17,7 @@ PARAVER_FILE = "Paraver (.prv)"
 PARAVER_MAGIC_HEADER = "#Paraver"
 
 
-class ParaverReader(Reader):
+class ParaverReader:
     def header_date(self, header: str):
         date, _, other = header.replace("#Paraver (", "").replace("at ", "").partition("):")
         return datetime.strptime(date, "%d/%m/%Y %H:%M")

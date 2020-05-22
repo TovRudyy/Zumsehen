@@ -90,6 +90,9 @@ def test_seq_prv_trace_parser(parser_params, use_dask):
             assert_equals_if_rows(df_comm.values, df_comm_test.values)
 
 
+# TODO fix
+
+
 @pytest.mark.parametrize("use_dask", (False, True))
 def test_e2e_parse_and_read(use_dask):
     writer = Writer()

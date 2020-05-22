@@ -38,9 +38,10 @@ def prv_header_test_data():
             data.append(
                 (header, (sol["ExecTime"], datetime.strptime(sol["Date"], "%d/%m/%Y %H:%M"), sol["Nodes"], sol["Apps"]))
             )
-        else:
-            pass
     return data
+
+
+# TODO fix
 
 
 def test_prv_header_parser():

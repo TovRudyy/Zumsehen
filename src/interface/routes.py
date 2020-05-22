@@ -1,13 +1,13 @@
 import logging
 import os
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from flask import flash, redirect, render_template, request, url_for
 
-from src.Trace import Trace
+from src.core.controller import get_table_data
 from src.interface import app
 from src.persistence.controller import parse_trace
-from src.core.controller import get_table_data
+from src.Trace import Trace
 
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)

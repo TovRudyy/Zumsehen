@@ -160,7 +160,7 @@ def test_nested_filters(df, attributes, operators, args, expected_df):
         ),
     ),
 )
-def test_filter_from_to(df, attribute, start_value, end_value, expected_df):
+def test_filter_from_to_another(df, attribute, start_value, end_value, expected_df):
     filter_util = Filter()
     filter_util = filter_util.add_operator(df, attribute, "from_to", start_value, end_value)
     result = filter_util.execute(df).compute()
