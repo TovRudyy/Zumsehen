@@ -1,24 +1,19 @@
 import logging
 from typing import Iterable
 
+import dask.dataframe as dd
+
+from src.CONST import Record
+
 logging.basicConfig(format="%(levelname)s :: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-filter_attributes = {
-    "state",
-    "event_t",
-    "event_v",
-    "thread_id",
-    "lsend",  # TODO verify
-    "psend",  # TODO verify
-    "size",
-    "time",
-}
 
-
-def _check_attribute(attribute):
-    if attribute not in filter_attributes:
-        raise Exception(f"Cannot filter by {attribute}. List of possible attributes: {', '.join(filter_attributes)}.")
+def _check_attribute(attribute: Record):
+    if not attribute.can_filter:
+        raise Exception(
+            f"Cannot filter by {attribute}. List of possible attributes: {', '.join(Record.filter_attributes())}."
+        )
 
 
 # this functions compute the bit mask of the DataFrame indices that meet the condition
@@ -50,8 +45,6 @@ def _filter_greater_or_equal(df, attribute, value):
 
 def _filter_from_to(df, attribute, start_value=None, end_value=None):
     logger.info(f"start_value {start_value}, end_value {end_value}")
-    if attribute not in filter_attributes:
-        raise Exception(f"Cannot filter by {attribute}.")
 
     if start_value is not None and end_value is not None:
         mask = (df[attribute] >= start_value) & (df[attribute] < end_value)
@@ -82,7 +75,7 @@ def _filter_contains(df, attribute, values: Iterable):
 # =, !=, <, <=, >, >=, [], [)
 
 
-class Transformation:
+class Filter:
     _operator_function = {
         "==": _filter_equal,
         "=": _filter_equal,
@@ -98,13 +91,13 @@ class Transformation:
     def __init__(self):
         self.mask = None
 
-    def add_operator(self, df, attribute, operator, *args):
+    def add_operator(self, df: dd.DataFrame, attribute: Record, operator: str, *args):
         """
         Stores the result bit mask after adding an operator. Only filters in execute(), doesn't do any additional
         computation besides computing the bit masks.
         """
         _check_attribute(attribute)
-        added_operator = self._operator_function[operator](df, attribute, *args)
+        added_operator = self._operator_function[operator](df, attribute.name, *args)
         logger.debug(f"adding operator {attribute} {operator} {args}")
         if self.mask is None:
             self.mask = added_operator

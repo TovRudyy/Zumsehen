@@ -6,9 +6,8 @@ from datetime import datetime
 import h5py
 
 from src.persistence.prv_to_hdf5 import ParaverToHDF5
-from src.persistence.reader import Reader
 from src.persistence.writer import Writer
-from src.TraceMetaData import TraceMetaData
+from src.Trace import TraceMetaData
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -17,16 +16,15 @@ PARAVER_FILE = "Paraver (.prv)"
 PARAVER_MAGIC_HEADER = "#Paraver"
 
 
-class ParaverReader(Reader):
+class ParaverReader:
     def header_date(self, header: str):
         date, _, other = header.replace("#Paraver (", "").replace("at ", "").partition("):")
-        date = datetime.strptime(date, "%d/%m/%Y %H:%M")
-        return date
+        return datetime.strptime(date, "%d/%m/%Y %H:%M")
 
     def header_time(self, header):
-        time, _, other = header[header.find("):") + 2 :].partition("_ns")
-        time = int(time)
-        return time
+        # in microseconds
+        time_ns, _, other = header[header.find("):") + 2 :].partition("_ns")
+        return int(time_ns) // 1000
 
     def header_nodes(self, header: str):
         nodes = header[header.find("_ns:") + 4 :]

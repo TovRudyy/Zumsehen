@@ -41,11 +41,20 @@ def prv_header_test_data():
                 sol = json.load(output)
 
             data.append(
-                (header, (sol["ExecTime"], datetime.strptime(sol["Date"], "%d/%m/%Y %H:%M"), sol["Nodes"], sol["Apps"]))
+                (
+                    header,
+                    (
+                        sol["ExecTime"] // 1000,
+                        datetime.strptime(sol["Date"], "%d/%m/%Y %H:%M"),
+                        sol["Nodes"],
+                        sol["Apps"],
+                    ),
+                )
             )
-        else:
-            pass
     return data
+
+
+# TODO fix
 
 
 def test_prv_header_parser():

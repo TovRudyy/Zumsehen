@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div id="analyze_page">
+        <div id="maincontent">
+            {% if current_trace %}
+                <div>Current trace selected: {{ current_trace.metadata.name }}.</div>
+                <div>Path: {{ current_trace.metadata.path }}.</div>
+                <div>Type: {{ current_trace.metadata.type }}.</div>
+                <div>Execution time: {{ current_trace.metadata.exec_time }}.</div>
+                <div>Date: {{ current_trace.metadata.date_time.isoformat() }}</div>
+                <div>Nodes: {{ current_trace.metadata.nodes }}</div>
+                <div>Apps: {{ current_trace.metadata.apps }}</div>
+                <br>
+                <div id="visualizations">
+                    <a class="btn btn-primary" href="{{ url_for('visualize_table') }}" target="_blank">Visualize table</a>
+                </div>
+            {% else %}
+                <div>No trace selected.</div>
+            {% endif %}
+        </div>
+        <div id="rightmenu">
+            <div id="rightmenuelements">
+                <h3>Selected traces</h3>
+                <div id="traces_menu">
+                    {% for trace_name in traces.keys() %}
+                    <div>
+                        <a href="{{ url_for('select_trace', selected_trace_name=trace_name) }}">{{ trace_name }}</a>
+                        <a class="btn btn-primary" href="{{ url_for('drop_trace', droped_trace_name=trace_name) }}">Drop</a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
